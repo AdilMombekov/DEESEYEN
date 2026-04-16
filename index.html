@@ -297,7 +297,7 @@
     </div>
 
     <div id="tb-right">
-      <input id="tb-project" type="text" value="DEESEYEN" placeholder="Название...">
+      <input id="tb-project" type="text" value="Мой проект" placeholder="Название...">
       <span class="badge">Beta</span>
     </div>
   </header>
@@ -412,6 +412,22 @@
         </div>
       </div>
 
+      <!-- Parametric cabinet (cm) -->
+      <div class="prop-section" id="param-cabinet-section" style="display:none">
+        <h4>Корпус (см)</h4>
+        <div class="prop-row"><div class="prop-label">Ширина</div><input class="xyz-field" id="cab-w-cm" type="number" min="30" max="200" step="1" value="80"></div>
+        <div class="prop-row"><div class="prop-label">Высота</div><input class="xyz-field" id="cab-h-cm" type="number" min="60" max="280" step="1" value="200"></div>
+        <div class="prop-row"><div class="prop-label">Глубина</div><input class="xyz-field" id="cab-d-cm" type="number" min="25" max="100" step="1" value="55"></div>
+        <div class="prop-row"><div class="prop-label">Полки</div><input class="xyz-field" id="cab-shelves" type="number" min="0" max="10" step="1" value="3"></div>
+        <div class="prop-row"><div class="prop-label">ДСП мм</div><input class="xyz-field" id="cab-thick-mm" type="number" min="8" max="28" step="1" value="18"></div>
+        <div class="prop-row" style="align-items:center;gap:8px">
+          <input type="checkbox" id="cab-handles" checked onchange="toggleCabinetHandles(this.checked)">
+          <label for="cab-handles" style="font-size:12px;color:var(--text-2);cursor:pointer">Ручки (фурнитура)</label>
+        </div>
+        <button type="button" class="act-btn" style="margin-top:8px" onclick="applyCabinetParams()">Применить размеры</button>
+        <p id="cab-load-hint" style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.4"></p>
+      </div>
+
       <!-- Color -->
       <div class="prop-section">
         <h4>Цвет</h4>
@@ -419,6 +435,14 @@
         <div class="color-custom">
           <input type="color" id="custom-color" value="#8B7355" oninput="applyColor(this.value)">
           <span style="font-size:11px;color:var(--text-2)">Свой цвет</span>
+        </div>
+        <div class="prop-row" style="margin-top:8px">
+          <div class="prop-label">RGB</div>
+          <div class="prop-xyz" style="display:flex;gap:4px;flex:1">
+            <input class="xyz-field" id="col-r" type="number" min="0" max="255" step="1" placeholder="R" title="R" style="flex:1" oninput="applyRGBFromFields()">
+            <input class="xyz-field" id="col-g" type="number" min="0" max="255" step="1" placeholder="G" title="G" style="flex:1" oninput="applyRGBFromFields()">
+            <input class="xyz-field" id="col-b" type="number" min="0" max="255" step="1" placeholder="B" title="B" style="flex:1" oninput="applyRGBFromFields()">
+          </div>
         </div>
       </div>
 
@@ -494,6 +518,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK LOG — all operations logged here
@@ -659,7 +684,11 @@ scene.add(roomMesh);
 const gridHelper = new THREE.GridHelper(ROOM_W, 20, 0x2a3450, 0x1e2a42);
 gridHelper.name = '__grid';
 scene.add(gridHelper);
-log('INIT', 'Room and grid created');
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+pmremGenerator.dispose();
+log('INIT', 'Room PMREM environment');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MATERIALS LIBRARY
@@ -698,6 +727,105 @@ function makeCyl(rt, rb, h, mat, segs=12, ox=0, oy=0, oz=0) {
   const m = setMeshProps(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, segs), mat));
   m.position.set(ox, oy, oz);
   return m;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETRIC CABINET (sizes in cm in UI → meters in Three.js)
+// ─────────────────────────────────────────────────────────────────────────────
+const PARAM_CABINET_DEFAULT = { wCm: 80, hCm: 200, dCm: 55, shelfCount: 3, thicknessMm: 18, handles: true };
+
+function clampNum(v, lo, hi) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return lo;
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function disposeMeshTree(root) {
+  root.traverse((node) => {
+    if (!node.isMesh) return;
+    node.geometry?.dispose();
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    mats.forEach((m) => m?.dispose?.());
+  });
+}
+
+/** Rebuilds all mesh children of `group` from `spec` (cm / mm). Preserves group transform. */
+function populateParametricCabinet(group, color, spec) {
+  while (group.children.length) {
+    const ch = group.children[0];
+    group.remove(ch);
+    disposeMeshTree(ch);
+  }
+
+  const W = clampNum(spec.wCm, 30, 200) / 100;
+  const H = clampNum(spec.hCm, 60, 280) / 100;
+  const D = clampNum(spec.dCm, 25, 100) / 100;
+  const tMm = clampNum(spec.thicknessMm ?? 18, 8, 28);
+  const t = tMm / 1000;
+  const nShelves = Math.floor(clampNum(spec.shelfCount ?? 0, 0, 10));
+  const handles = spec.handles !== false;
+
+  const bodyMat = makeMat(color, 'wood');
+  const doorMat = makeMat(color, 'wood');
+  doorMat.roughness = 0.42;
+  const metalMat = makeMat('#b8bcc6', 'metal');
+
+  group.add(makeBox(W, t, D, bodyMat, 0, t / 2, 0));
+  group.add(makeBox(W, t, D, bodyMat, 0, H - t / 2, 0));
+  group.add(makeBox(t, H - 2 * t, D, bodyMat, -W / 2 + t / 2, H / 2, 0));
+  group.add(makeBox(t, H - 2 * t, D, bodyMat, W / 2 - t / 2, H / 2, 0));
+  group.add(makeBox(W - 2 * t, H - 2 * t, t, bodyMat, 0, H / 2, -D / 2 + t / 2));
+
+  const innerH = H - 2 * t;
+  const shelfW = Math.max(0.05, W - 2 * t - 0.006);
+  const shelfD = Math.max(0.05, D - 2 * t - 0.006);
+  for (let i = 0; i < nShelves; i++) {
+    const y = t + (innerH / (nShelves + 1)) * (i + 1);
+    group.add(makeBox(shelfW, t, shelfD, bodyMat.clone(), 0, y, 0));
+  }
+
+  const doorTh = 0.014;
+  const doorH = Math.max(0.1, H - 2 * t - 0.02);
+  const innerW = W - 2 * t;
+  const halfW = innerW / 2 - 0.004;
+  const doorZ = D / 2 - doorTh / 2 - 0.001;
+  const yDoor = t + doorH / 2;
+  group.add(makeBox(halfW, doorH, doorTh, doorMat.clone(), -W / 2 + t + halfW / 2, yDoor, doorZ));
+  group.add(makeBox(halfW, doorH, doorTh, doorMat.clone(), W / 2 - t - halfW / 2, yDoor, doorZ));
+
+  if (handles) {
+    const hr = 0.012;
+    const hh = 0.2;
+    const hx = halfW * 0.55;
+    const hy = yDoor + doorH * 0.05;
+    const h1 = makeCyl(hr, hr, hh, metalMat, 10, -W / 2 + t + halfW - hx, hy, doorZ + doorTh / 2 + hr * 0.2);
+    const h2 = makeCyl(hr, hr, hh, metalMat, 10, W / 2 - t - halfW + hx, hy, doorZ + doorTh / 2 + hr * 0.2);
+    h1.traverse((n) => { if (n.isMesh) n.userData.skipColor = true; });
+    h2.traverse((n) => { if (n.isMesh) n.userData.skipColor = true; });
+    group.add(h1);
+    group.add(h2);
+  }
+
+  group.userData = group.userData || {};
+  group.userData.spec = {
+    wCm: Math.round(clampNum(spec.wCm, 30, 200)),
+    hCm: Math.round(clampNum(spec.hCm, 60, 280)),
+    dCm: Math.round(clampNum(spec.dCm, 25, 100)),
+    shelfCount: nShelves,
+    thicknessMm: Math.round(tMm),
+    handles,
+  };
+}
+
+/** Rough distributed load per shelf (kg), not for certification. */
+function estimateShelfLoadKg(spec) {
+  const wCm = clampNum(spec.wCm, 30, 200);
+  const dCm = clampNum(spec.dCm, 25, 100);
+  const tMm = clampNum(spec.thicknessMm ?? 18, 8, 28);
+  const spanM = Math.max(0.12, (wCm - 2 * (tMm / 10)) / 100);
+  const depthM = Math.max(0.15, (dCm - 4) / 100);
+  const k = 32 * (tMm / 18) ** 2 * (0.52 / spanM) * clampNum(depthM / 0.48, 0.45, 1.25);
+  return Math.round(clampNum(k, 6, 130));
 }
 
 // SOFA
@@ -948,6 +1076,7 @@ const CATALOG = [
   { id:'desk',         name:'Рабочий стол',     cat:'tables',  icon:'💻',  color:'#4a3f2f', build: buildDesk,       dims:'160×70' },
   { id:'side_table',   name:'Тумбочка',         cat:'tables',  icon:'🪵',  color:'#9a7a4a', build: buildSideTable,  dims:'50×50'  },
   { id:'wardrobe',     name:'Шкаф',             cat:'storage', icon:'🚪',  color:'#a07850', build: buildWardrobe,   dims:'140×56' },
+  { id:'param_cabinet',name:'Корпус (см)',      cat:'storage', icon:'📐',  color:'#a07850', build: null,          dims:'на заказ', parametric: true, defaultParams: { ...PARAM_CABINET_DEFAULT } },
   { id:'shelf',        name:'Стеллаж',          cat:'storage', icon:'📚',  color:'#6b5035', build: buildShelf,      dims:'100×35' },
   { id:'bed',          name:'Кровать',          cat:'beds',    icon:'🛏️',  color:'#7a5c38', build: buildBed,        dims:'170×210'},
   { id:'lamp',         name:'Торшер',           cat:'decor',   icon:'💡',  color:'#e0c080', build: buildLamp,       dims:'40×160' },
@@ -982,9 +1111,17 @@ function addFurniture(catId) {
   try {
     const def = CATALOG.find(c => c.id === catId);
     if (!def) throw new Error(`Unknown furniture id: ${catId}`);
+    if (!def.parametric && typeof def.build !== 'function') throw new Error(`No build() for ${catId}`);
 
-    const group = def.build(def.color);
-    group.userData = { catId: def.id, color: def.color, matType: 'wood', name: def.name };
+    let group;
+    if (def.parametric) {
+      group = new THREE.Group();
+      group.userData = { catId: def.id, color: def.color, matType: 'wood', name: def.name };
+      populateParametricCabinet(group, def.color, { ...def.defaultParams });
+    } else {
+      group = def.build(def.color);
+      group.userData = { catId: def.id, color: def.color, matType: 'wood', name: def.name };
+    }
 
     // Stagger placement so items don't stack
     const offset = objects.length;
@@ -997,6 +1134,7 @@ function addFurniture(catId) {
     scene.add(group);
 
     const entry = { group, catId: def.id, name: def.name, color: def.color, matType: 'wood' };
+    if (def.parametric) entry.params = { ...group.userData.spec };
     objects.push(entry);
 
     saveUndo('add', { catId, position: group.position.clone() });
@@ -1187,7 +1325,92 @@ function updatePropsPanel(entry) {
   updatePropPositionFields();
   document.getElementById('scale-all').value = entry.group.scale.x.toFixed(2);
   document.getElementById('custom-color').value = entry.color;
+  syncRgbFieldsFromHex(entry.color);
   buildMatGrid();
+
+  const cabSec = document.getElementById('param-cabinet-section');
+  if (entry.catId === 'param_cabinet' && entry.params) {
+    cabSec.style.display = 'block';
+    document.getElementById('cab-w-cm').value = entry.params.wCm;
+    document.getElementById('cab-h-cm').value = entry.params.hCm;
+    document.getElementById('cab-d-cm').value = entry.params.dCm;
+    document.getElementById('cab-shelves').value = entry.params.shelfCount;
+    document.getElementById('cab-thick-mm').value = entry.params.thicknessMm;
+    document.getElementById('cab-handles').checked = entry.params.handles !== false;
+    updateCabinetLoadHint(entry.params);
+  } else {
+    cabSec.style.display = 'none';
+  }
+}
+
+function syncRgbFieldsFromHex(hex) {
+  try {
+    const c = new THREE.Color(hex);
+    document.getElementById('col-r').value = Math.round(c.r * 255);
+    document.getElementById('col-g').value = Math.round(c.g * 255);
+    document.getElementById('col-b').value = Math.round(c.b * 255);
+  } catch (_) { /* ignore */ }
+}
+
+function applyRGBFromFields() {
+  if (!selectedObj) return;
+  const r = clampNum(document.getElementById('col-r').value, 0, 255);
+  const g = clampNum(document.getElementById('col-g').value, 0, 255);
+  const b = clampNum(document.getElementById('col-b').value, 0, 255);
+  const hex = '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+  applyColor(hex);
+}
+
+function updateCabinetLoadHint(spec) {
+  const el = document.getElementById('cab-load-hint');
+  if (!el || !spec) return;
+  const kg = estimateShelfLoadKg(spec);
+  el.textContent = `Оценка нагрузки одной полки (равномерно): ~${kg} кг. Эвристика для ориентира, не сертификация.`;
+}
+
+function readCabinetParamsFromInputs() {
+  return {
+    wCm: clampNum(document.getElementById('cab-w-cm').value, 30, 200),
+    hCm: clampNum(document.getElementById('cab-h-cm').value, 60, 280),
+    dCm: clampNum(document.getElementById('cab-d-cm').value, 25, 100),
+    shelfCount: Math.floor(clampNum(document.getElementById('cab-shelves').value, 0, 10)),
+    thicknessMm: clampNum(document.getElementById('cab-thick-mm').value, 8, 28),
+    handles: document.getElementById('cab-handles').checked,
+  };
+}
+
+function applyCabinetParams() {
+  if (!selectedObj || selectedObj.catId !== 'param_cabinet') return;
+  try {
+    const next = readCabinetParamsFromInputs();
+    selectedObj.params = next;
+    populateParametricCabinet(selectedObj.group, selectedObj.color, next);
+    Object.assign(selectedObj.params, selectedObj.group.userData.spec);
+    updateCabinetLoadHint(selectedObj.params);
+    applyMaterial(selectedObj.matType || 'wood');
+    selectObject(selectedObj);
+    setStatus('Корпус пересобран по размерам (см)');
+    log('CABINET', JSON.stringify(selectedObj.params));
+    showToast('Размеры корпуса применены');
+  } catch (err) {
+    handleError('applyCabinetParams', err);
+  }
+}
+
+function toggleCabinetHandles(on) {
+  if (!selectedObj || selectedObj.catId !== 'param_cabinet') return;
+  try {
+    selectedObj.params = selectedObj.params || readCabinetParamsFromInputs();
+    selectedObj.params.handles = !!on;
+    populateParametricCabinet(selectedObj.group, selectedObj.color, selectedObj.params);
+    Object.assign(selectedObj.params, selectedObj.group.userData.spec);
+    updateCabinetLoadHint(selectedObj.params);
+    applyMaterial(selectedObj.matType || 'wood');
+    selectObject(selectedObj);
+    log('HANDLES', on ? 'on' : 'off');
+  } catch (err) {
+    handleError('toggleCabinetHandles', err);
+  }
 }
 
 function updatePropPositionFields() {
@@ -1208,10 +1431,18 @@ function updatePropPositionFields() {
 function applyColor(hex) {
   if (!selectedObj) return;
   try {
-    const color = new THREE.Color(hex);
     selectedObj.color = hex;
+    if (selectedObj.catId === 'param_cabinet' && selectedObj.params) {
+      populateParametricCabinet(selectedObj.group, hex, selectedObj.params);
+      document.getElementById('custom-color').value = hex;
+      syncRgbFieldsFromHex(hex);
+      selectObject(selectedObj);
+      log('COLOR', `${selectedObj.name} → ${hex} (корпус пересобран)`);
+      return;
+    }
     selectedObj.group.traverse(child => {
       if (!child.isMesh) return;
+      if (child.userData.skipColor) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       mats.forEach(m => {
         if (m.transparent && m.opacity < 0.8) return; // Don't recolor glass
@@ -1219,6 +1450,7 @@ function applyColor(hex) {
       });
     });
     document.getElementById('custom-color').value = hex;
+    syncRgbFieldsFromHex(hex);
     log('COLOR', `${selectedObj.name} → ${hex}`);
   } catch(err) {
     handleError('applyColor', err);
@@ -1233,6 +1465,7 @@ function applyMaterial(type) {
     currentMatType = type;
     selectedObj.group.traverse(child => {
       if (!child.isMesh) return;
+      if (child.userData.skipColor) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       mats.forEach(m => {
         m.roughness = p.roughness;
@@ -1303,14 +1536,22 @@ function duplicateSelected() {
   try {
     const def = CATALOG.find(c => c.id === selectedObj.catId);
     if (!def) throw new Error('Catalog entry not found');
-    const newGroup = def.build(selectedObj.color);
-    newGroup.userData = { ...selectedObj.group.userData };
+    let newGroup;
+    if (def.parametric && selectedObj.params) {
+      newGroup = new THREE.Group();
+      newGroup.userData = { ...selectedObj.group.userData };
+      populateParametricCabinet(newGroup, selectedObj.color, { ...selectedObj.params });
+    } else {
+      newGroup = def.build(selectedObj.color);
+      newGroup.userData = { ...selectedObj.group.userData };
+    }
     newGroup.position.copy(selectedObj.group.position);
     newGroup.position.x += 1.0;
     newGroup.rotation.copy(selectedObj.group.rotation);
     newGroup.scale.copy(selectedObj.group.scale);
     scene.add(newGroup);
     const entry = { group: newGroup, catId: selectedObj.catId, name: selectedObj.name + ' (копия)', color: selectedObj.color, matType: selectedObj.matType };
+    if (def.parametric && selectedObj.params) entry.params = { ...newGroup.userData.spec };
     objects.push(entry);
     selectObject(entry);
     updateSceneList();
@@ -1566,6 +1807,7 @@ function exportJSON() {
         position: o.group.position.toArray(),
         rotation: [o.group.rotation.x, o.group.rotation.y, o.group.rotation.z],
         scale: o.group.scale.x,
+        params: o.params ? { ...o.params } : undefined,
       }))
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1593,13 +1835,23 @@ function importJSON() {
         (data.objects || []).forEach(obj => {
           const def = CATALOG.find(c => c.id === obj.catId);
           if (!def) return;
-          const group = def.build(obj.color || def.color);
-          group.userData = { catId: obj.catId, name: obj.name, color: obj.color, matType: obj.matType };
+          let group;
+          if (def.parametric && obj.params) {
+            group = new THREE.Group();
+            group.userData = { catId: obj.catId, name: obj.name, color: obj.color, matType: obj.matType };
+            populateParametricCabinet(group, obj.color || def.color, { ...obj.params });
+          } else {
+            if (typeof def.build !== 'function') return;
+            group = def.build(obj.color || def.color);
+            group.userData = { catId: obj.catId, name: obj.name, color: obj.color, matType: obj.matType };
+          }
           group.position.fromArray(obj.position || [0,0,0]);
           group.rotation.set(...(obj.rotation || [0,0,0]));
           group.scale.setScalar(obj.scale || 1);
           scene.add(group);
-          objects.push({ group, catId: obj.catId, name: obj.name, color: obj.color || def.color, matType: obj.matType || 'wood' });
+          const row = { group, catId: obj.catId, name: obj.name, color: obj.color || def.color, matType: obj.matType || 'wood' };
+          if (def.parametric && obj.params) row.params = { ...group.userData.spec };
+          objects.push(row);
         });
         updateSceneList(); updateObjectCount(); updateEmptyHint();
         setStatus(`Загружено: ${data.name} (${objects.length} объектов)`);
@@ -1763,6 +2015,9 @@ window.redo = redo;
 window.selectFromList = selectFromList;
 window.selectFromListAndDelete = selectFromListAndDelete;
 window.closeModal = closeModal;
+window.applyCabinetParams = applyCabinetParams;
+window.applyRGBFromFields = applyRGBFromFields;
+window.toggleCabinetHandles = toggleCabinetHandles;
 
 init();
 </script>
