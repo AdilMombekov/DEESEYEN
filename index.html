@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEESEYEN — 3D Furniture Builder</title>
+<style>
+  /* ── RESET & BASE ──────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-0: #080c14;
+    --bg-1: #0f1420;
+    --bg-2: #161d2e;
+    --bg-3: #1e273a;
+    --bg-4: #252f45;
+    --text-1: #e8edf7;
+    --text-2: #9aa5bc;
+    --text-3: #5a6680;
+    --accent: #6366f1;
+    --accent-glow: rgba(99,102,241,0.35);
+    --accent-light: #818cf8;
+    --green: #22d3a5;
+    --orange: #fb923c;
+    --red: #f87171;
+    --glass: rgba(22,29,46,0.82);
+    --border: rgba(255,255,255,0.07);
+    --border-active: rgba(99,102,241,0.6);
+    --shadow-deep: 0 8px 32px rgba(0,0,0,0.6);
+    --radius: 10px;
+    --transition: 0.18s ease;
+    --panel-w: 260px;
+    --topbar-h: 48px;
+    --statusbar-h: 28px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-0); color: var(--text-1); font-family: var(--font); font-size: 13px; }
+
+  /* ── LAYOUT ──────────────────────────────────────────────────────── */
+  #app { display: grid; width: 100vw; height: 100vh;
+    grid-template:
+      "topbar topbar topbar" var(--topbar-h)
+      "catalog viewport props" 1fr
+      "statusbar statusbar statusbar" var(--statusbar-h)
+      / var(--panel-w) 1fr var(--panel-w);
+  }
+
+  /* ── TOPBAR ───────────────────────────────────────────────────────── */
+  #topbar {
+    grid-area: topbar;
+    display: flex; align-items: center; gap: 4px; padding: 0 12px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+  #logo { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; color: var(--accent-light); margin-right: 12px; display: flex; align-items: center; gap: 6px; }
+  #logo svg { width: 22px; height: 22px; }
+  .tb-group { display: flex; gap: 2px; margin-right: 6px; }
+  .tb-btn {
+    display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: none;
+    background: transparent; color: var(--text-2); border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-family: var(--font); transition: var(--transition);
+  }
+  .tb-btn:hover { background: var(--bg-3); color: var(--text-1); }
+  .tb-btn.active { background: var(--bg-3); color: var(--accent-light); }
+  .tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  #tb-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  #tb-project { background: none; border: none; color: var(--text-1); font-size: 13px; font-family: var(--font); outline: none; width: 160px; text-align: center; padding: 3px 8px; border-radius: 5px; transition: var(--transition); }
+  #tb-project:hover, #tb-project:focus { background: var(--bg-3); }
+  .badge { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; background: var(--accent); color: #fff; }
+
+  /* ── CATALOG PANEL ───────────────────────────────────────────────── */
+  #catalog {
+    grid-area: catalog;
+    background: var(--bg-1);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #catalog-header { padding: 10px 12px 6px; display: flex; flex-direction: column; gap: 8px; }
+  #catalog-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); }
+  .search-box { display: flex; align-items: center; gap: 6px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; }
+  .search-box input { background: none; border: none; outline: none; color: var(--text-1); font-size: 12px; font-family: var(--font); width: 100%; }
+  .search-box input::placeholder { color: var(--text-3); }
+  .cat-tabs { display: flex; gap: 2px; padding: 0 12px 8px; flex-wrap: wrap; }
+  .cat-tab { padding: 3px 9px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-2); font-size: 11px; cursor: pointer; transition: var(--transition); }
+  .cat-tab:hover { background: var(--bg-3); color: var(--text-1); }
+  .cat-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #catalog-items { overflow-y: auto; padding: 6px 10px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; scrollbar-width: thin; scrollbar-color: var(--bg-3) transparent; }
+  .cat-item {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 6px 8px; cursor: pointer; text-align: center;
+    transition: var(--transition); display: flex; flex-direction: column; align-items: center; gap: 5px;
+    user-select: none;
+  }
+  .cat-item:hover { background: var(--bg-3); border-color: var(--border-active); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.2); }
+  .cat-item .icon { font-size: 26px; line-height: 1; }
+  .cat-item .name { font-size: 11px; color: var(--text-2); font-weight: 500; }
+  .cat-item .dim { font-size: 10px; color: var(--text-3); }
+  .cat-section-label { grid-column: 1/-1; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); padding: 6px 2px 2px; }
+
+  /* ── VIEWPORT ────────────────────────────────────────────────────── */
+  #viewport { grid-area: viewport; position: relative; overflow: hidden; background: var(--bg-0); }
+  #canvas3d { width: 100%; height: 100%; display: block; }
+
+  /* HUD overlays */
+  #hud-topleft { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; }
+  #hud-topright { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  #hud-bottomleft { position: absolute; bottom: 10px; left: 10px; font-size: 11px; color: var(--text-3); }
+  .hud-pill {
+    background: var(--glass); backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 4px 11px; font-size: 11px; color: var(--text-2);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .hud-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+  .view-btns { display: flex; gap: 4px; }
+  .view-btn {
+    background: var(--glass); backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 5px 10px; font-size: 11px; color: var(--text-2);
+    cursor: pointer; transition: var(--transition);
+  }
+  .view-btn:hover { color: var(--text-1); border-color: var(--border-active); }
+  .view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #fps-counter { font-size: 10px; color: var(--green); font-variant-numeric: tabular-nums; }
+  #mode-indicator {
+    position: absolute; bottom: 10px; right: 10px;
+    background: var(--glass); backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 5px 12px; font-size: 11px; color: var(--accent-light);
+    display: none;
+  }
+  /* Empty state */
+  #empty-hint {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center; pointer-events: none; transition: opacity 0.4s;
+  }
+  #empty-hint .big-icon { font-size: 64px; opacity: 0.15; }
+  #empty-hint p { color: var(--text-3); font-size: 13px; margin-top: 8px; line-height: 1.6; }
+
+  /* ── PROPERTIES PANEL ────────────────────────────────────────────── */
+  #props {
+    grid-area: props;
+    background: var(--bg-1);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--bg-3) transparent;
+  }
+  .prop-section { padding: 12px; border-bottom: 1px solid var(--border); }
+  .prop-section h4 { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); margin-bottom: 10px; }
+  .no-selection { padding: 24px 16px; color: var(--text-3); font-size: 12px; line-height: 1.6; text-align: center; }
+  .no-selection .icon { font-size: 36px; display: block; margin-bottom: 8px; opacity: 0.4; }
+  .prop-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .prop-label { font-size: 11px; color: var(--text-2); width: 32px; flex-shrink: 0; }
+  .prop-input {
+    flex: 1; background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 5px; color: var(--text-1); font-size: 11px; font-family: var(--font);
+    padding: 4px 7px; outline: none; transition: var(--transition);
+  }
+  .prop-input:focus { border-color: var(--border-active); }
+  .prop-xyz { display: flex; gap: 4px; flex: 1; }
+  .xyz-field { flex: 1; background: var(--bg-2); border: 1px solid var(--border); border-radius: 5px; color: var(--text-1); font-size: 11px; font-family: var(--font); padding: 4px 5px; outline: none; text-align: center; transition: var(--transition); }
+  .xyz-field:focus { border-color: var(--border-active); }
+  .xyz-x:focus { border-color: #f87171; }
+  .xyz-y:focus { border-color: #4ade80; }
+  .xyz-z:focus { border-color: #60a5fa; }
+
+  /* Color swatches */
+  .color-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 5px; cursor: pointer;
+    border: 2px solid transparent; transition: var(--transition);
+  }
+  .swatch:hover, .swatch.active { border-color: var(--text-1); transform: scale(1.1); }
+  .color-custom { display: flex; align-items: center; gap: 8px; }
+  input[type=color] { width: 32px; height: 28px; border: none; border-radius: 5px; cursor: pointer; background: none; padding: 0; }
+
+  /* Material buttons */
+  .mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .mat-btn {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 4px; font-size: 11px; color: var(--text-2); cursor: pointer;
+    text-align: center; transition: var(--transition);
+  }
+  .mat-btn:hover { background: var(--bg-3); color: var(--text-1); }
+  .mat-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Action buttons */
+  .action-btns { display: flex; flex-direction: column; gap: 6px; }
+  .act-btn {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 7px;
+    color: var(--text-2); cursor: pointer; font-size: 12px; font-family: var(--font);
+    transition: var(--transition);
+  }
+  .act-btn:hover { background: var(--bg-3); color: var(--text-1); border-color: rgba(255,255,255,0.12); }
+  .act-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* Scene list */
+  #scene-list { display: flex; flex-direction: column; gap: 3px; }
+  .scene-item {
+    display: flex; align-items: center; gap: 7px; padding: 5px 8px;
+    border-radius: 6px; cursor: pointer; transition: var(--transition); font-size: 11px;
+  }
+  .scene-item:hover { background: var(--bg-2); }
+  .scene-item.selected { background: rgba(99,102,241,0.15); color: var(--accent-light); }
+  .scene-item .s-icon { font-size: 14px; }
+  .scene-item .s-name { flex: 1; }
+  .scene-item .s-del { opacity: 0; color: var(--red); font-size: 13px; }
+  .scene-item:hover .s-del { opacity: 1; }
+
+  /* Keyboard hints */
+  #shortcuts { padding: 10px 12px; }
+  #shortcuts h4 { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); margin-bottom: 8px; }
+  .shortcut-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .shortcut-row .desc { font-size: 11px; color: var(--text-2); }
+  .kbd { background: var(--bg-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--text-2); font-family: monospace; }
+
+  /* ── STATUS BAR ──────────────────────────────────────────────────── */
+  #statusbar {
+    grid-area: statusbar;
+    background: var(--bg-2); border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px; gap: 16px;
+    font-size: 11px; color: var(--text-3);
+  }
+  #status-msg { flex: 1; }
+  #status-msg.error { color: var(--red); }
+  #status-objects { }
+  .status-sep { color: var(--border); }
+
+  /* ── TOAST ───────────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 18px; font-size: 12px; color: var(--text-1);
+    opacity: 0; transition: all 0.25s ease; pointer-events: none; white-space: nowrap;
+    box-shadow: var(--shadow-deep);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── MODAL ───────────────────────────────────────────────────────── */
+  #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
+  #modal-overlay.show { display: flex; }
+  .modal { background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px; padding: 24px; min-width: 340px; max-width: 500px; box-shadow: var(--shadow-deep); }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .modal p { color: var(--text-2); font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-primary { background: var(--accent); border: none; border-radius: 7px; color: #fff; padding: 7px 16px; font-size: 12px; cursor: pointer; font-family: var(--font); transition: var(--transition); }
+  .btn-primary:hover { background: var(--accent-light); }
+  .btn-secondary { background: var(--bg-3); border: 1px solid var(--border); border-radius: 7px; color: var(--text-2); padding: 7px 16px; font-size: 12px; cursor: pointer; font-family: var(--font); transition: var(--transition); }
+  .btn-secondary:hover { color: var(--text-1); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOP BAR -->
+  <header id="topbar">
+    <div id="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="2" y="14" width="8" height="6" rx="1.5"/>
+        <rect x="14" y="14" width="8" height="6" rx="1.5"/>
+        <rect x="2" y="8" width="20" height="4" rx="1.5"/>
+        <line x1="6" y1="8" x2="6" y2="14"/>
+        <line x1="18" y1="8" x2="18" y2="14"/>
+      </svg>
+      DEESEYEN
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" onclick="newScene()" title="Новая сцена">✦ Новая</button>
+      <button class="tb-btn" onclick="exportJSON()" title="Сохранить JSON">⬇ Сохранить</button>
+      <button class="tb-btn" onclick="importJSON()" title="Открыть JSON">⬆ Открыть</button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn active" id="btn-3d" onclick="setView('3d')">3D Вид</button>
+      <button class="tb-btn" id="btn-top" onclick="setView('top')">Сверху</button>
+      <button class="tb-btn" id="btn-front" onclick="setView('front')">Фронт</button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btn-grid" onclick="toggleGrid()" title="Сетка">⊞ Сетка</button>
+      <button class="tb-btn" id="btn-shadows" onclick="toggleShadows()" title="Тени">◐ Тени</button>
+      <button class="tb-btn" onclick="resetCamera()" title="Сброс камеры">⌂ Камера</button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn" onclick="undo()" title="Ctrl+Z">↩ Отмена</button>
+      <button class="tb-btn" onclick="redo()" title="Ctrl+Y">↪ Повтор</button>
+    </div>
+
+    <div id="tb-right">
+      <input id="tb-project" type="text" value="DEESEYEN" placeholder="Название...">
+      <span class="badge">Beta</span>
+    </div>
+  </header>
+
+  <!-- LEFT CATALOG -->
+  <aside id="catalog">
+    <div id="catalog-header">
+      <h3>Каталог мебели</h3>
+      <div class="search-box">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="search-input" type="text" placeholder="Поиск..." oninput="filterCatalog(this.value)">
+      </div>
+    </div>
+    <div class="cat-tabs">
+      <button class="cat-tab active" onclick="filterCat('all',this)">Все</button>
+      <button class="cat-tab" onclick="filterCat('seating',this)">Сиденья</button>
+      <button class="cat-tab" onclick="filterCat('tables',this)">Столы</button>
+      <button class="cat-tab" onclick="filterCat('storage',this)">Хранение</button>
+      <button class="cat-tab" onclick="filterCat('beds',this)">Кровати</button>
+      <button class="cat-tab" onclick="filterCat('decor',this)">Декор</button>
+    </div>
+    <div id="catalog-items"></div>
+  </aside>
+
+  <!-- VIEWPORT -->
+  <main id="viewport">
+    <canvas id="canvas3d"></canvas>
+
+    <div id="hud-topleft">
+      <div class="hud-pill"><span></span>WebGL Active</div>
+    </div>
+
+    <div id="hud-topright">
+      <div class="view-btns">
+        <button class="view-btn active" onclick="setMode('move')" title="Переместить [G]">✥ Move</button>
+        <button class="view-btn" onclick="setMode('rotate')" title="Вращать [R]">↻ Rot</button>
+        <button class="view-btn" onclick="setMode('scale')" title="Масштаб [S]">⤢ Scale</button>
+      </div>
+    </div>
+
+    <div id="hud-bottomleft">
+      <span id="fps-counter">60 fps</span> &nbsp;·&nbsp;
+      <span id="tri-count">0 треугольников</span>
+    </div>
+
+    <div id="empty-hint">
+      <div class="big-icon">🛋️</div>
+      <p>Нажми на мебель в каталоге<br>или перетащи на сцену</p>
+    </div>
+
+    <div id="mode-indicator">MOVE</div>
+  </main>
+
+  <!-- RIGHT PROPERTIES -->
+  <aside id="props">
+    <div id="no-sel-msg" class="no-selection">
+      <span class="icon">🖱️</span>
+      Выбери объект<br>на сцене для<br>редактирования
+    </div>
+
+    <div id="sel-props" style="display:none">
+      <!-- Object name -->
+      <div class="prop-section">
+        <h4>Объект</h4>
+        <input class="prop-input" id="obj-name" type="text" placeholder="Название" oninput="renameSelected(this.value)">
+      </div>
+
+      <!-- Transform -->
+      <div class="prop-section">
+        <h4>Позиция</h4>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#f87171">X</div>
+          <div class="prop-xyz">
+            <input class="xyz-field xyz-x" id="pos-x" type="number" step="0.1" oninput="updateTransform()">
+          </div>
+        </div>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#4ade80">Y</div>
+          <div class="prop-xyz">
+            <input class="xyz-field xyz-y" id="pos-y" type="number" step="0.1" oninput="updateTransform()">
+          </div>
+        </div>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#60a5fa">Z</div>
+          <div class="prop-xyz">
+            <input class="xyz-field xyz-z" id="pos-z" type="number" step="0.1" oninput="updateTransform()">
+          </div>
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <h4>Вращение (°)</h4>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#f87171">X</div>
+          <input class="xyz-field" id="rot-x" type="number" step="5" oninput="updateTransform()">
+        </div>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#4ade80">Y</div>
+          <input class="xyz-field" id="rot-y" type="number" step="5" oninput="updateTransform()">
+        </div>
+        <div class="prop-row">
+          <div class="prop-label" style="color:#60a5fa">Z</div>
+          <input class="xyz-field" id="rot-z" type="number" step="5" oninput="updateTransform()">
+        </div>
+      </div>
+
+      <div class="prop-section">
+        <h4>Масштаб</h4>
+        <div class="prop-row">
+          <div class="prop-label">XYZ</div>
+          <input class="xyz-field" id="scale-all" type="number" step="0.05" min="0.1" value="1" oninput="updateScale(this.value)">
+        </div>
+      </div>
+
+      <!-- Color -->
+      <div class="prop-section">
+        <h4>Цвет</h4>
+        <div class="color-swatches" id="swatches"></div>
+        <div class="color-custom">
+          <input type="color" id="custom-color" value="#8B7355" oninput="applyColor(this.value)">
+          <span style="font-size:11px;color:var(--text-2)">Свой цвет</span>
+        </div>
+      </div>
+
+      <!-- Material -->
+      <div class="prop-section">
+        <h4>Материал</h4>
+        <div class="mat-grid" id="mat-grid"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="prop-section">
+        <h4>Действия</h4>
+        <div class="action-btns">
+          <button class="act-btn" onclick="duplicateSelected()">⧉ Дублировать <span class="kbd">Ctrl+D</span></button>
+          <button class="act-btn" onclick="focusSelected()">⊙ В центр <span class="kbd">F</span></button>
+          <button class="act-btn danger" onclick="deleteSelected()">✕ Удалить <span class="kbd">Del</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene list -->
+    <div class="prop-section">
+      <h4>Объекты в сцене</h4>
+      <div id="scene-list"></div>
+    </div>
+
+    <!-- Shortcuts -->
+    <div id="shortcuts">
+      <h4>Горячие клавиши</h4>
+      <div class="shortcut-row"><span class="desc">Переместить</span><span class="kbd">G</span></div>
+      <div class="shortcut-row"><span class="desc">Вращать</span><span class="kbd">R</span></div>
+      <div class="shortcut-row"><span class="desc">Масштаб</span><span class="kbd">S</span></div>
+      <div class="shortcut-row"><span class="desc">Удалить</span><span class="kbd">Del</span></div>
+      <div class="shortcut-row"><span class="desc">Дублировать</span><span class="kbd">Ctrl+D</span></div>
+      <div class="shortcut-row"><span class="desc">Фокус</span><span class="kbd">F</span></div>
+      <div class="shortcut-row"><span class="desc">Отмена</span><span class="kbd">Ctrl+Z</span></div>
+      <div class="shortcut-row"><span class="desc">Снять выбор</span><span class="kbd">Esc</span></div>
+    </div>
+  </aside>
+
+  <!-- STATUS BAR -->
+  <footer id="statusbar">
+    <span id="status-msg">Готово — нажми на мебель в каталоге чтобы добавить</span>
+    <span class="status-sep">|</span>
+    <span id="status-objects">Объектов: 0</span>
+    <span class="status-sep">|</span>
+    <span>DEESEYEN v1.0 Demo</span>
+  </footer>
+</div>
+
+<div id="toast"></div>
+<div id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">Новая сцена</h3>
+    <p id="modal-body">Очистить текущую сцену? Все несохранённые изменения будут потеряны.</p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+      <button class="btn-primary" id="modal-confirm">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<!-- THREE.JS CDN -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK LOG — all operations logged here
+// ─────────────────────────────────────────────────────────────────────────────
+const taskLog = [];
+function log(action, detail = '') {
+  const entry = { t: Date.now(), action, detail };
+  taskLog.push(entry);
+  if (taskLog.length > 200) taskLog.shift();
+  console.log(`[DEESEYEN] ${action}${detail ? ': ' + detail : ''}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERROR HANDLING — review on error
+// ─────────────────────────────────────────────────────────────────────────────
+function handleError(context, err) {
+  const msg = err?.message || String(err);
+  log('ERROR', `[${context}] ${msg}`);
+  setStatus(`⚠ Ошибка в ${context}: ${msg}`, true);
+  showToast(`Ошибка: ${msg.slice(0, 60)}`);
+  // Review: log recent actions before error for debugging
+  const recent = taskLog.slice(-5).map(e => e.action).join(' → ');
+  console.warn(`[ERROR REVIEW] Context: ${context} | Recent: ${recent} | Error: ${msg}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REFERENCES (Research findings embedded)
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+  REFERENCE BASE — compiled from research 2026-04-10
+
+  TOP INSPIRATIONS:
+  1. Planner 5D   — 2D↔3D toggle, 8000+ items, version history
+  2. Homestyler   — AI layout gen, 300k models, NVIDIA cloud render
+  3. IKEA Place   — AR 98% accuracy, contextual help, social sharing
+  4. Roomstyler   — Tabbed nav (Build/Furnish/Decorate), contextual props
+  5. SketchUp Web — Left toolbar, dual input (click+drag / click+move+click)
+  6. Spline       — Dark theme 3D, glassmorphic panels
+  7. Blender      — G/R/S shortcuts, properties panel right side
+  8. Figma        — Left component catalog, search, categories
+
+  UX INSIGHTS APPLIED:
+  - Catalog on left with search + category filters (Figma pattern)
+  - Properties on right, contextual (no modals for props)
+  - G/R/S keyboard shortcuts (Blender pattern)
+  - Dark premium theme with glassmorphism panels
+  - Grid floor for spatial alignment (universal 3D pattern)
+  - Snap-to-grid for non-pixel positioning
+  - Undo/Redo history (stack pattern)
+  - Scene object list for easy re-selection
+  - FPS counter + triangle count (dev transparency)
+
+  COLOR PALETTE:
+  Primary: #6366f1 (Indigo-500) — modern, premium
+  Dark BG: #080c14, #0f1420, #161d2e (deep navy gradient)
+  Success: #22d3a5 (teal)
+  Warning: #fb923c (orange)
+  Error: #f87171 (rose)
+
+  GEOMETRY PATTERNS USED:
+  - Sofa: 3 BoxGeometry (cushion + backrest + armrests) + 4 CylinderGeometry (legs)
+  - Chair: 2 BoxGeometry (seat + back) + 4 CylinderGeometry (legs)
+  - Table: 1 BoxGeometry (top) + 4 CylinderGeometry (legs)
+  - Shelf: 2 BoxGeometry (sides) + N BoxGeometry (shelves)
+  - Bed: 3 BoxGeometry (mattress + headboard + footboard) + 4 CylinderGeometry (legs)
+  - Lamp: CylinderGeometry (base) + LatheGeometry (shade) + PointLight
+*/
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCENE SETUP
+// ─────────────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas3d');
+
+// WebGL availability check
+if (!window.WebGLRenderingContext) {
+  document.getElementById('empty-hint').innerHTML = '<p style="color:var(--red)">WebGL недоступен в этом браузере.<br>Попробуй Chrome, Firefox или Edge.</p>';
+}
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+log('INIT', 'Renderer created');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080c14);
+scene.fog = new THREE.Fog(0x080c14, 18, 35);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(8, 7, 10);
+camera.lookAt(0, 0, 0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTROLS
+// ─────────────────────────────────────────────────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 2;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.82;
+controls.target.set(0, 0.5, 0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIGHTING
+// ─────────────────────────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x3a4a6b, 1.2);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.2);
+sunLight.position.set(8, 12, 6);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.1;
+sunLight.shadow.camera.far = 50;
+sunLight.shadow.camera.left = -12;
+sunLight.shadow.camera.right = 12;
+sunLight.shadow.camera.top = 12;
+sunLight.shadow.camera.bottom = -12;
+sunLight.shadow.bias = -0.0003;
+sunLight.shadow.normalBias = 0.02;
+scene.add(sunLight);
+
+const fillLight = new THREE.DirectionalLight(0x6070cc, 0.6);
+fillLight.position.set(-5, 3, -5);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0x2255bb, 0.4);
+rimLight.position.set(0, 5, -8);
+scene.add(rimLight);
+log('INIT', 'Lights added');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOM
+// ─────────────────────────────────────────────────────────────────────────────
+const ROOM_W = 10, ROOM_H = 3.2, ROOM_D = 10;
+
+// Floor
+const floorGeo = new THREE.PlaneGeometry(ROOM_W * 2, ROOM_D * 2);
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1e2e, roughness: 0.85, metalness: 0.05,
+});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+floor.name = '__floor';
+scene.add(floor);
+
+// Room walls
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e2438, roughness: 0.9, metalness: 0, side: THREE.BackSide });
+const roomGeo = new THREE.BoxGeometry(ROOM_W, ROOM_H, ROOM_D);
+const roomMesh = new THREE.Mesh(roomGeo, wallMat);
+roomMesh.position.y = ROOM_H / 2;
+roomMesh.receiveShadow = true;
+roomMesh.name = '__room';
+scene.add(roomMesh);
+
+// Grid
+const gridHelper = new THREE.GridHelper(ROOM_W, 20, 0x2a3450, 0x1e2a42);
+gridHelper.name = '__grid';
+scene.add(gridHelper);
+log('INIT', 'Room and grid created');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MATERIALS LIBRARY
+// ─────────────────────────────────────────────────────────────────────────────
+const MAT_PARAMS = {
+  wood:    { roughness: 0.7, metalness: 0.05 },
+  fabric:  { roughness: 0.95, metalness: 0.0 },
+  metal:   { roughness: 0.25, metalness: 0.85 },
+  glass:   { roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.55 },
+  plastic: { roughness: 0.55, metalness: 0.1 },
+  leather: { roughness: 0.65, metalness: 0.05 },
+};
+let currentMatType = 'wood';
+
+function makeMat(color, type = 'wood') {
+  const p = MAT_PARAMS[type] || MAT_PARAMS.wood;
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color), ...p });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FURNITURE CONSTRUCTORS (primitives only, no GLB)
+// ─────────────────────────────────────────────────────────────────────────────
+function setMeshProps(mesh, castShadow = true) {
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function makeBox(w, h, d, mat, ox=0, oy=0, oz=0) {
+  const m = setMeshProps(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
+  m.position.set(ox, oy, oz);
+  return m;
+}
+
+function makeCyl(rt, rb, h, mat, segs=12, ox=0, oy=0, oz=0) {
+  const m = setMeshProps(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, segs), mat));
+  m.position.set(ox, oy, oz);
+  return m;
+}
+
+// SOFA
+function buildSofa(color) {
+  const g = new THREE.Group();
+  const bodyMat = makeMat(color, 'fabric');
+  const legMat = makeMat('#333844', 'metal');
+  // Seat
+  g.add(makeBox(1.8, 0.35, 0.9, bodyMat, 0, 0.55, 0));
+  // Back
+  g.add(makeBox(1.8, 0.6, 0.22, bodyMat, 0, 0.98, -0.34));
+  // Left arm
+  g.add(makeBox(0.22, 0.52, 0.9, bodyMat, -0.79, 0.88, 0));
+  // Right arm
+  g.add(makeBox(0.22, 0.52, 0.9, bodyMat, 0.79, 0.88, 0));
+  // Cushions (2)
+  g.add(makeBox(0.82, 0.15, 0.78, bodyMat.clone(), -0.44, 0.76, 0.02));
+  g.add(makeBox(0.82, 0.15, 0.78, bodyMat.clone(), 0.44, 0.76, 0.02));
+  // Legs (4 cylinders)
+  const legH = 0.2; const legR = 0.04;
+  g.add(makeCyl(legR,legR,legH,legMat,8, -0.75,legH/2,-0.35));
+  g.add(makeCyl(legR,legR,legH,legMat,8,  0.75,legH/2,-0.35));
+  g.add(makeCyl(legR,legR,legH,legMat,8, -0.75,legH/2, 0.35));
+  g.add(makeCyl(legR,legR,legH,legMat,8,  0.75,legH/2, 0.35));
+  return g;
+}
+
+// ARMCHAIR
+function buildChair(color) {
+  const g = new THREE.Group();
+  const bodyMat = makeMat(color, 'fabric');
+  const legMat = makeMat('#2a2d38', 'metal');
+  // Seat
+  g.add(makeBox(0.75, 0.18, 0.72, bodyMat, 0, 0.5, 0));
+  // Back
+  g.add(makeBox(0.75, 0.72, 0.18, bodyMat, 0, 0.87, -0.27));
+  // Arms
+  g.add(makeBox(0.16, 0.22, 0.68, bodyMat, -0.29, 0.71, 0));
+  g.add(makeBox(0.16, 0.22, 0.68, bodyMat,  0.29, 0.71, 0));
+  // Legs
+  [[-.28,.32],[.28,.32],[-.28,-.28],[.28,-.28]].forEach(([x,z]) =>
+    g.add(makeCyl(0.03,0.03,0.42,legMat,8, x,0.21,z))
+  );
+  return g;
+}
+
+// DINING TABLE
+function buildDiningTable(color) {
+  const g = new THREE.Group();
+  const topMat = makeMat(color, 'wood');
+  const legMat = makeMat(color, 'wood');
+  // Top
+  g.add(makeBox(1.8, 0.08, 0.9, topMat, 0, 0.78, 0));
+  // Legs
+  [[-.8,.36],[.8,.36],[-.8,-.36],[.8,-.36]].forEach(([x,z]) =>
+    g.add(makeCyl(0.05,0.06,0.72,legMat,8, x,0.36,z))
+  );
+  return g;
+}
+
+// COFFEE TABLE
+function buildCoffeeTable(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'wood');
+  const glassMat = makeMat(0xaaccff, 'glass');
+  // Glass top
+  g.add(makeBox(1.1, 0.05, 0.55, glassMat, 0, 0.38, 0));
+  // Frame
+  g.add(makeBox(1.1, 0.04, 0.04, mat, 0, 0.35, 0.24));
+  g.add(makeBox(1.1, 0.04, 0.04, mat, 0, 0.35, -0.24));
+  // Legs
+  [[-.5,.22],[.5,.22],[-.5,-.22],[.5,-.22]].forEach(([x,z]) =>
+    g.add(makeCyl(0.04,0.04,0.32,mat,8, x,0.16,z))
+  );
+  return g;
+}
+
+// WARDROBE
+function buildWardrobe(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'wood');
+  const doorMat = makeMat(color, 'wood');
+  doorMat.roughness = 0.45;
+  // Body
+  g.add(makeBox(1.4, 2.1, 0.56, mat, 0, 1.05, 0));
+  // Doors (2 panels slightly offset)
+  g.add(makeBox(0.67, 1.96, 0.04, doorMat, -0.34, 1.05, 0.3));
+  g.add(makeBox(0.67, 1.96, 0.04, doorMat,  0.34, 1.05, 0.3));
+  // Handles
+  const handleMat = makeMat('#cccccc', 'metal');
+  g.add(makeCyl(0.015,0.015,0.25,handleMat,6, -0.05,1.05,0.35));
+  g.add(makeCyl(0.015,0.015,0.25,handleMat,6,  0.65,1.05,0.35));
+  return g;
+}
+
+// BOOKSHELF
+function buildShelf(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'wood');
+  // Sides
+  g.add(makeBox(0.04, 1.8, 0.35, mat, -0.52, 0.9, 0));
+  g.add(makeBox(0.04, 1.8, 0.35, mat,  0.52, 0.9, 0));
+  // Back panel
+  g.add(makeBox(1.0, 1.8, 0.03, mat, 0, 0.9, -0.16));
+  // Shelves (5)
+  for (let i=0;i<5;i++) {
+    g.add(makeBox(1.0, 0.03, 0.35, mat, 0, i*0.4+0.05, 0));
+  }
+  return g;
+}
+
+// BED
+function buildBed(color) {
+  const g = new THREE.Group();
+  const frameMat = makeMat(color, 'wood');
+  const mattressMat = makeMat('#e8ddd0', 'fabric');
+  const pillowMat = makeMat('#f5f0ea', 'fabric');
+  // Frame base
+  g.add(makeBox(1.7, 0.24, 2.1, frameMat, 0, 0.12, 0));
+  // Headboard
+  g.add(makeBox(1.7, 0.9, 0.12, frameMat, 0, 0.7, -1.0));
+  // Footboard
+  g.add(makeBox(1.7, 0.32, 0.1, frameMat, 0, 0.4, 1.0));
+  // Mattress
+  g.add(makeBox(1.55, 0.26, 1.92, mattressMat, 0, 0.38, -0.04));
+  // Pillows
+  g.add(makeBox(0.6, 0.12, 0.42, pillowMat, -0.42, 0.56, -0.7));
+  g.add(makeBox(0.6, 0.12, 0.42, pillowMat,  0.42, 0.56, -0.7));
+  // Legs
+  [[-.78,-.95],[.78,-.95],[-.78,.95],[.78,.95]].forEach(([x,z]) =>
+    g.add(makeCyl(0.06,0.06,0.22,frameMat,8, x,0.11,z))
+  );
+  return g;
+}
+
+// SIDE TABLE
+function buildSideTable(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'wood');
+  g.add(makeBox(0.5, 0.04, 0.5, mat, 0, 0.62, 0));
+  g.add(makeBox(0.5, 0.04, 0.5, mat, 0, 0.35, 0));
+  [[-.2,.2],[.2,.2],[-.2,-.2],[.2,-.2]].forEach(([x,z]) =>
+    g.add(makeCyl(0.03,0.03,0.6,mat,8, x,0.3,z))
+  );
+  return g;
+}
+
+// FLOOR LAMP
+function buildLamp(color) {
+  const g = new THREE.Group();
+  const poleMat = makeMat('#bbbbbb', 'metal');
+  const shadeMat = makeMat(color, 'fabric');
+  shadeMat.side = THREE.DoubleSide;
+  // Base
+  g.add(makeCyl(0.22,0.28,0.06,poleMat,16, 0,0.03,0));
+  // Pole
+  g.add(makeCyl(0.025,0.025,1.55,poleMat,8, 0,0.8,0));
+  // Shade (truncated cone) using ConeGeometry + flip
+  const shadeGeo = new THREE.CylinderGeometry(0.0, 0.28, 0.36, 16, 1, true);
+  const shadeMesh = setMeshProps(new THREE.Mesh(shadeGeo, shadeMat));
+  shadeMesh.position.set(0, 1.72, 0);
+  g.add(shadeMesh);
+  // Light bulb glow
+  const bulbGeo = new THREE.SphereGeometry(0.06, 8, 8);
+  const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffeeaa, emissive: 0xffddaa, emissiveIntensity: 1.2 });
+  const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+  bulb.position.set(0, 1.58, 0);
+  g.add(bulb);
+  // Actual point light
+  const pl = new THREE.PointLight(0xffe0a0, 1.5, 5, 2);
+  pl.position.set(0, 1.58, 0);
+  g.add(pl);
+  return g;
+}
+
+// RUG
+function buildRug(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'fabric');
+  mat.roughness = 1.0;
+  const geo = new THREE.BoxGeometry(2.4, 0.025, 1.6);
+  const mesh = setMeshProps(new THREE.Mesh(geo, mat));
+  mesh.position.y = 0.013;
+  g.add(mesh);
+  // Border
+  const borderMat = makeMat(color, 'fabric');
+  borderMat.color.multiplyScalar(0.7);
+  g.add(makeBox(2.4, 0.025, 0.08, borderMat, 0, 0.013, 0.76));
+  g.add(makeBox(2.4, 0.025, 0.08, borderMat, 0, 0.013, -0.76));
+  g.add(makeBox(0.08, 0.025, 1.44, borderMat, 1.16, 0.013, 0));
+  g.add(makeBox(0.08, 0.025, 1.44, borderMat, -1.16, 0.013, 0));
+  return g;
+}
+
+// OFFICE CHAIR
+function buildOfficeChair(color) {
+  const g = new THREE.Group();
+  const bodyMat = makeMat(color, 'leather');
+  const mechMat = makeMat('#222222', 'metal');
+  // Seat
+  g.add(makeBox(0.62, 0.12, 0.58, bodyMat, 0, 0.5, 0));
+  // Back + lumbar
+  g.add(makeBox(0.62, 0.62, 0.1, bodyMat, 0, 0.85, -0.24));
+  g.add(makeBox(0.5, 0.12, 0.08, bodyMat, 0, 0.57, -0.21));
+  // Arms
+  g.add(makeBox(0.06, 0.06, 0.38, mechMat, -.28, 0.59, 0));
+  g.add(makeBox(0.06, 0.06, 0.38, mechMat,  .28, 0.59, 0));
+  g.add(makeBox(0.28, 0.05, 0.08, bodyMat, -.28, 0.64, -.06));
+  g.add(makeBox(0.28, 0.05, 0.08, bodyMat,  .28, 0.64, -.06));
+  // Pneumatic pole
+  g.add(makeCyl(0.04,0.055,0.45,mechMat,8, 0,0.23,0));
+  // 5-star base with small wheels
+  const starMat = mechMat;
+  for (let i=0;i<5;i++) {
+    const ang = (i/5)*Math.PI*2;
+    g.add(makeBox(0.32,0.04,0.06, starMat, Math.sin(ang)*0.25, 0.02, Math.cos(ang)*0.25));
+  }
+  return g;
+}
+
+// DESK
+function buildDesk(color) {
+  const g = new THREE.Group();
+  const mat = makeMat(color, 'wood');
+  const legMat = makeMat('#2a2d38', 'metal');
+  // Top
+  g.add(makeBox(1.6, 0.06, 0.7, mat, 0, 0.74, 0));
+  // Cable tray underside
+  g.add(makeBox(0.9, 0.05, 0.06, mat, 0.2, 0.68, 0.28));
+  // Left panel leg
+  g.add(makeBox(0.06, 0.7, 0.65, legMat, -0.76, 0.35, 0));
+  // Right panel leg
+  g.add(makeBox(0.06, 0.7, 0.65, legMat, 0.76, 0.35, 0));
+  // Cross bar
+  g.add(makeBox(1.46, 0.04, 0.04, legMat, 0, 0.1, 0));
+  return g;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATALOG DEFINITION
+// ─────────────────────────────────────────────────────────────────────────────
+const CATALOG = [
+  { id:'sofa',         name:'Диван',           cat:'seating', icon:'🛋️',  color:'#7c6a55', build: buildSofa,       dims:'180×90' },
+  { id:'chair',        name:'Кресло',           cat:'seating', icon:'💺',  color:'#5c7a6a', build: buildChair,      dims:'75×72'  },
+  { id:'office_chair', name:'Офисное кресло',   cat:'seating', icon:'🪑',  color:'#2a2d38', build: buildOfficeChair,dims:'62×58'  },
+  { id:'dining_table', name:'Обед. стол',       cat:'tables',  icon:'🍽️',  color:'#8B6914', build: buildDiningTable,dims:'180×90' },
+  { id:'coffee_table', name:'Журн. стол',       cat:'tables',  icon:'☕',  color:'#7a6040', build: buildCoffeeTable,dims:'110×55' },
+  { id:'desk',         name:'Рабочий стол',     cat:'tables',  icon:'💻',  color:'#4a3f2f', build: buildDesk,       dims:'160×70' },
+  { id:'side_table',   name:'Тумбочка',         cat:'tables',  icon:'🪵',  color:'#9a7a4a', build: buildSideTable,  dims:'50×50'  },
+  { id:'wardrobe',     name:'Шкаф',             cat:'storage', icon:'🚪',  color:'#a07850', build: buildWardrobe,   dims:'140×56' },
+  { id:'shelf',        name:'Стеллаж',          cat:'storage', icon:'📚',  color:'#6b5035', build: buildShelf,      dims:'100×35' },
+  { id:'bed',          name:'Кровать',          cat:'beds',    icon:'🛏️',  color:'#7a5c38', build: buildBed,        dims:'170×210'},
+  { id:'lamp',         name:'Торшер',           cat:'decor',   icon:'💡',  color:'#e0c080', build: buildLamp,       dims:'40×160' },
+  { id:'rug',          name:'Ковёр',            cat:'decor',   icon:'🟫',  color:'#8B4513', build: buildRug,        dims:'240×160'},
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const objects = []; // { group, id, name, color, matType, catId }
+let selectedObj = null;
+let currentMode = 'move';
+let showGrid = true;
+let showShadows = true;
+let currentCat = 'all';
+let undoStack = [];
+let redoStack = [];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNDO/REDO
+// ─────────────────────────────────────────────────────────────────────────────
+function saveUndo(type, data) {
+  undoStack.push({ type, data, timestamp: Date.now() });
+  if (undoStack.length > 30) undoStack.shift();
+  redoStack = [];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD FURNITURE
+// ─────────────────────────────────────────────────────────────────────────────
+function addFurniture(catId) {
+  try {
+    const def = CATALOG.find(c => c.id === catId);
+    if (!def) throw new Error(`Unknown furniture id: ${catId}`);
+
+    const group = def.build(def.color);
+    group.userData = { catId: def.id, color: def.color, matType: 'wood', name: def.name };
+
+    // Stagger placement so items don't stack
+    const offset = objects.length;
+    group.position.set(
+      (Math.random() - 0.5) * 4,
+      0,
+      (Math.random() - 0.5) * 4
+    );
+    group.castShadow = true;
+    scene.add(group);
+
+    const entry = { group, catId: def.id, name: def.name, color: def.color, matType: 'wood' };
+    objects.push(entry);
+
+    saveUndo('add', { catId, position: group.position.clone() });
+
+    selectObject(entry);
+    updateSceneList();
+    updateObjectCount();
+    updateEmptyHint();
+    setStatus(`Добавлен: ${def.name}`);
+    log('ADD', def.name);
+    showToast(`+ ${def.name} добавлен`);
+  } catch(err) {
+    handleError('addFurniture', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTION
+// ─────────────────────────────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredObj = null;
+
+function getSelectableObjects() {
+  return objects.map(o => o.group.children).flat();
+}
+
+function findParentEntry(mesh) {
+  for (const entry of objects) {
+    if (entry.group === mesh || entry.group.children.includes(mesh) ||
+        mesh.parent === entry.group) return entry;
+  }
+  // Deep search
+  for (const entry of objects) {
+    let cur = mesh;
+    while (cur) {
+      if (cur === entry.group) return entry;
+      cur = cur.parent;
+    }
+  }
+  return null;
+}
+
+function selectObject(entry) {
+  clearSelection();
+  if (!entry) return;
+  selectedObj = entry;
+  // Highlight: emissive glow on all meshes in group
+  entry.group.traverse(child => {
+    if (child.isMesh && child.material) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach(m => { m.emissive = new THREE.Color(0x3344aa); m.emissiveIntensity = 0.25; });
+    }
+  });
+  updatePropsPanel(entry);
+  updateSceneList();
+  log('SELECT', entry.name);
+}
+
+function clearSelection() {
+  if (!selectedObj) return;
+  selectedObj.group.traverse(child => {
+    if (child.isMesh && child.material) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach(m => { m.emissive = new THREE.Color(0x000000); m.emissiveIntensity = 0; });
+    }
+  });
+  selectedObj = null;
+  document.getElementById('sel-props').style.display = 'none';
+  document.getElementById('no-sel-msg').style.display = 'block';
+  updateSceneList();
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  // Ignore clicks on UI (should already be blocked by canvas bounds)
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(objects.map(o => o.group), true);
+
+  if (hits.length > 0) {
+    const entry = findParentEntry(hits[0].object);
+    if (entry) {
+      selectObject(entry);
+      e.stopPropagation();
+    }
+  } else {
+    clearSelection();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRAG TO MOVE (simple XZ plane drag)
+// ─────────────────────────────────────────────────────────────────────────────
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const dragTarget = new THREE.Vector3();
+let isDragging = false;
+let dragStartMouse = null;
+let dragStartPos = null;
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !selectedObj || currentMode !== 'move') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+  const hits = raycaster.intersectObjects([selectedObj.group], true);
+  if (hits.length > 0) {
+    isDragging = true;
+    dragStartPos = selectedObj.group.position.clone();
+    controls.enabled = false;
+    setStatus('Перетаскивание... отпусти для размещения');
+  }
+}, { capture: true });
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!isDragging || !selectedObj) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+  raycaster.ray.intersectPlane(floorPlane, dragTarget);
+  if (dragTarget) {
+    // Snap to 0.25 grid
+    selectedObj.group.position.x = Math.round(dragTarget.x / 0.25) * 0.25;
+    selectedObj.group.position.z = Math.round(dragTarget.z / 0.25) * 0.25;
+    updatePropPositionFields();
+  }
+});
+
+canvas.addEventListener('pointerup', () => {
+  if (isDragging && selectedObj && dragStartPos) {
+    const newPos = selectedObj.group.position.clone();
+    if (!newPos.equals(dragStartPos)) {
+      saveUndo('move', { entry: selectedObj, from: dragStartPos, to: newPos });
+      setStatus(`${selectedObj.name} перемещён`);
+    }
+  }
+  if (isRotating && selectedObj) {
+    saveUndo('rotate', { entry: selectedObj, from: rotStartAngle, to: selectedObj.group.rotation.y });
+    setStatus(`${selectedObj.name} повёрнут`);
+  }
+  isDragging = false;
+  isRotating = false;
+  dragStartPos = null;
+  controls.enabled = true;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPERTIES PANEL UPDATE
+// ─────────────────────────────────────────────────────────────────────────────
+const SWATCHES = ['#c8a46e','#7c6a55','#4a6c8c','#5c7a6a','#8c5c5c','#2a2d38','#e8e0d0','#3d5a3e','#6b4c3b','#8B4513','#b5b5b5','#2d4a6b'];
+
+function buildSwatches() {
+  const container = document.getElementById('swatches');
+  container.innerHTML = '';
+  SWATCHES.forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'swatch';
+    s.style.background = c;
+    s.title = c;
+    s.onclick = () => applyColor(c);
+    container.appendChild(s);
+  });
+}
+
+function buildMatGrid() {
+  const container = document.getElementById('mat-grid');
+  const mats = ['wood','fabric','metal','glass','plastic','leather'];
+  const labels = ['Дерево','Ткань','Металл','Стекло','Пластик','Кожа'];
+  container.innerHTML = '';
+  mats.forEach((m, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'mat-btn' + (m === currentMatType ? ' active' : '');
+    btn.textContent = labels[i];
+    btn.onclick = () => { applyMaterial(m); document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+    container.appendChild(btn);
+  });
+}
+
+function updatePropsPanel(entry) {
+  document.getElementById('no-sel-msg').style.display = 'none';
+  document.getElementById('sel-props').style.display = 'block';
+  document.getElementById('obj-name').value = entry.name;
+  updatePropPositionFields();
+  document.getElementById('scale-all').value = entry.group.scale.x.toFixed(2);
+  document.getElementById('custom-color').value = entry.color;
+  buildMatGrid();
+}
+
+function updatePropPositionFields() {
+  if (!selectedObj) return;
+  const p = selectedObj.group.position;
+  const r = selectedObj.group.rotation;
+  document.getElementById('pos-x').value = p.x.toFixed(2);
+  document.getElementById('pos-y').value = p.y.toFixed(2);
+  document.getElementById('pos-z').value = p.z.toFixed(2);
+  document.getElementById('rot-x').value = (r.x * 180 / Math.PI).toFixed(1);
+  document.getElementById('rot-y').value = (r.y * 180 / Math.PI).toFixed(1);
+  document.getElementById('rot-z').value = (r.z * 180 / Math.PI).toFixed(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLOR & MATERIAL
+// ─────────────────────────────────────────────────────────────────────────────
+function applyColor(hex) {
+  if (!selectedObj) return;
+  try {
+    const color = new THREE.Color(hex);
+    selectedObj.color = hex;
+    selectedObj.group.traverse(child => {
+      if (!child.isMesh) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach(m => {
+        if (m.transparent && m.opacity < 0.8) return; // Don't recolor glass
+        m.color.set(hex);
+      });
+    });
+    document.getElementById('custom-color').value = hex;
+    log('COLOR', `${selectedObj.name} → ${hex}`);
+  } catch(err) {
+    handleError('applyColor', err);
+  }
+}
+
+function applyMaterial(type) {
+  if (!selectedObj) return;
+  try {
+    const p = MAT_PARAMS[type] || MAT_PARAMS.wood;
+    selectedObj.matType = type;
+    currentMatType = type;
+    selectedObj.group.traverse(child => {
+      if (!child.isMesh) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach(m => {
+        m.roughness = p.roughness;
+        m.metalness = p.metalness;
+        if (p.transparent !== undefined) m.transparent = p.transparent;
+        if (p.opacity !== undefined) m.opacity = p.opacity;
+        m.needsUpdate = true;
+      });
+    });
+    log('MATERIAL', `${selectedObj.name} → ${type}`);
+  } catch(err) {
+    handleError('applyMaterial', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSFORM FROM INPUTS
+// ─────────────────────────────────────────────────────────────────────────────
+function updateTransform() {
+  if (!selectedObj) return;
+  try {
+    const g = selectedObj.group;
+    g.position.x = parseFloat(document.getElementById('pos-x').value) || 0;
+    g.position.y = parseFloat(document.getElementById('pos-y').value) || 0;
+    g.position.z = parseFloat(document.getElementById('pos-z').value) || 0;
+    g.rotation.x = (parseFloat(document.getElementById('rot-x').value) || 0) * Math.PI / 180;
+    g.rotation.y = (parseFloat(document.getElementById('rot-y').value) || 0) * Math.PI / 180;
+    g.rotation.z = (parseFloat(document.getElementById('rot-z').value) || 0) * Math.PI / 180;
+  } catch(err) {
+    handleError('updateTransform', err);
+  }
+}
+
+function updateScale(val) {
+  if (!selectedObj) return;
+  const s = Math.max(0.05, parseFloat(val) || 1);
+  selectedObj.group.scale.setScalar(s);
+}
+
+function renameSelected(name) {
+  if (!selectedObj) return;
+  selectedObj.name = name;
+  selectedObj.group.userData.name = name;
+  updateSceneList();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE / DUPLICATE
+// ─────────────────────────────────────────────────────────────────────────────
+function deleteSelected() {
+  if (!selectedObj) return;
+  const entry = selectedObj;
+  const idx = objects.indexOf(entry);
+  saveUndo('delete', { entry, idx });
+  scene.remove(entry.group);
+  objects.splice(idx, 1);
+  clearSelection();
+  updateSceneList();
+  updateObjectCount();
+  updateEmptyHint();
+  setStatus(`Удалён: ${entry.name}`);
+  log('DELETE', entry.name);
+  showToast(`✕ ${entry.name} удалён`);
+}
+
+function duplicateSelected() {
+  if (!selectedObj) return;
+  try {
+    const def = CATALOG.find(c => c.id === selectedObj.catId);
+    if (!def) throw new Error('Catalog entry not found');
+    const newGroup = def.build(selectedObj.color);
+    newGroup.userData = { ...selectedObj.group.userData };
+    newGroup.position.copy(selectedObj.group.position);
+    newGroup.position.x += 1.0;
+    newGroup.rotation.copy(selectedObj.group.rotation);
+    newGroup.scale.copy(selectedObj.group.scale);
+    scene.add(newGroup);
+    const entry = { group: newGroup, catId: selectedObj.catId, name: selectedObj.name + ' (копия)', color: selectedObj.color, matType: selectedObj.matType };
+    objects.push(entry);
+    selectObject(entry);
+    updateSceneList();
+    updateObjectCount();
+    setStatus(`Дублировано: ${entry.name}`);
+    log('DUPLICATE', entry.name);
+  } catch(err) {
+    handleError('duplicateSelected', err);
+  }
+}
+
+function focusSelected() {
+  if (!selectedObj) return;
+  const pos = selectedObj.group.position;
+  controls.target.copy(pos);
+  controls.target.y = 0.5;
+  log('FOCUS', selectedObj.name);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNDO / REDO
+// ─────────────────────────────────────────────────────────────────────────────
+function undo() {
+  const action = undoStack.pop();
+  if (!action) { showToast('Нечего отменить'); return; }
+  try {
+    if (action.type === 'add') {
+      const last = objects[objects.length - 1];
+      if (last) { scene.remove(last.group); objects.pop(); updateSceneList(); updateObjectCount(); updateEmptyHint(); }
+    } else if (action.type === 'delete') {
+      scene.add(action.data.entry.group);
+      objects.splice(action.data.idx, 0, action.data.entry);
+      updateSceneList(); updateObjectCount(); updateEmptyHint();
+    } else if (action.type === 'move') {
+      action.data.entry.group.position.copy(action.data.from);
+    }
+    redoStack.push(action);
+    clearSelection();
+    setStatus('Отмена выполнена');
+    log('UNDO', action.type);
+  } catch(err) {
+    handleError('undo', err);
+  }
+}
+
+function redo() {
+  const action = redoStack.pop();
+  if (!action) { showToast('Нечего повторить'); return; }
+  try {
+    if (action.type === 'move') {
+      action.data.entry.group.position.copy(action.data.to);
+    } else if (action.type === 'rotate') {
+      action.data.entry.group.rotation.y = action.data.to;
+    } else if (action.type === 'delete') {
+      const idx = objects.indexOf(action.data.entry);
+      if (idx !== -1) {
+        scene.remove(action.data.entry.group);
+        objects.splice(idx, 1);
+        updateSceneList(); updateObjectCount(); updateEmptyHint();
+      }
+    }
+    undoStack.push(action);
+    clearSelection();
+    setStatus('Повтор выполнен');
+    log('REDO', action.type);
+  } catch(err) {
+    handleError('redo', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT') return;
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z') { e.preventDefault(); undo(); return; }
+    if (e.key === 'y') { e.preventDefault(); redo(); return; }
+    if (e.key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  }
+
+  switch(e.key) {
+    case 'Delete': case 'Backspace': deleteSelected(); break;
+    case 'g': setMode('move'); break;
+    case 'r': setMode('rotate'); break;
+    case 's': setMode('scale'); break;
+    case 'f': focusSelected(); break;
+    case 'Escape': clearSelection(); break;
+    case 'ArrowLeft':  if(selectedObj){ selectedObj.group.position.x -= 0.25; updatePropPositionFields(); } break;
+    case 'ArrowRight': if(selectedObj){ selectedObj.group.position.x += 0.25; updatePropPositionFields(); } break;
+    case 'ArrowUp':    if(selectedObj){ selectedObj.group.position.z -= 0.25; updatePropPositionFields(); } break;
+    case 'ArrowDown':  if(selectedObj){ selectedObj.group.position.z += 0.25; updatePropPositionFields(); } break;
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROTATE MODE (drag on selected object while in rotate mode)
+// ─────────────────────────────────────────────────────────────────────────────
+let isRotating = false, rotStartX = 0, rotStartY = 0, rotStartAngle = 0;
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !selectedObj || currentMode !== 'rotate') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+  const hits = raycaster.intersectObjects([selectedObj.group], true);
+  if (hits.length > 0) {
+    isRotating = true;
+    rotStartX = e.clientX;
+    rotStartAngle = selectedObj.group.rotation.y;
+    controls.enabled = false;
+  }
+}, { capture: true });
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!isRotating || !selectedObj || currentMode !== 'rotate') return;
+  const dx = e.clientX - rotStartX;
+  selectedObj.group.rotation.y = rotStartAngle + dx * 0.012;
+  updatePropPositionFields();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCENE LIST
+// ─────────────────────────────────────────────────────────────────────────────
+function updateSceneList() {
+  const list = document.getElementById('scene-list');
+  if (objects.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--text-3);padding:4px 2px">Сцена пуста</div>';
+    return;
+  }
+  list.innerHTML = objects.map((o, i) => {
+    const def = CATALOG.find(c => c.id === o.catId);
+    const isSelected = selectedObj === o;
+    return `<div class="scene-item ${isSelected ? 'selected' : ''}" onclick="selectFromList(${i})">
+      <span class="s-icon">${def ? def.icon : '📦'}</span>
+      <span class="s-name">${o.name}</span>
+      <span class="s-del" onclick="event.stopPropagation();selectFromListAndDelete(${i})">✕</span>
+    </div>`;
+  }).join('');
+}
+
+function selectFromList(idx) {
+  selectObject(objects[idx]);
+}
+function selectFromListAndDelete(idx) {
+  selectObject(objects[idx]);
+  deleteSelected();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATALOG RENDERING
+// ─────────────────────────────────────────────────────────────────────────────
+function renderCatalog(filter = '', cat = 'all') {
+  const container = document.getElementById('catalog-items');
+  const filtered = CATALOG.filter(c =>
+    (cat === 'all' || c.cat === cat) &&
+    (filter === '' || c.name.toLowerCase().includes(filter.toLowerCase()))
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="grid-column:1/-1;font-size:11px;color:var(--text-3);padding:8px 2px">Ничего не найдено</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(c =>
+    `<div class="cat-item" onclick="addFurniture('${c.id}')" title="Нажми для добавления">
+      <span class="icon">${c.icon}</span>
+      <span class="name">${c.name}</span>
+      <span class="dim">${c.dims} см</span>
+    </div>`
+  ).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIEW CONTROLS
+// ─────────────────────────────────────────────────────────────────────────────
+function setView(v) {
+  try {
+    const animated = { '3d': [8,7,10], 'top': [0,18,0.01], 'front': [0,4,14] }[v];
+    if (!animated) return;
+    const [tx,ty,tz] = animated;
+    camera.position.set(tx, ty, tz);
+    controls.target.set(0, 0.5, 0);
+    controls.update();
+    document.querySelectorAll('#topbar .tb-btn').forEach(b => {
+      if (b.id === `btn-${v}`) b.classList.add('active');
+      else if (['btn-3d','btn-top','btn-front'].includes(b.id)) b.classList.remove('active');
+    });
+    log('VIEW', v);
+  } catch(err) { handleError('setView', err); }
+}
+
+function toggleGrid() {
+  showGrid = !showGrid;
+  gridHelper.visible = showGrid;
+  document.getElementById('btn-grid').classList.toggle('active', showGrid);
+  log('GRID', showGrid ? 'on' : 'off');
+}
+
+function toggleShadows() {
+  showShadows = !showShadows;
+  renderer.shadowMap.enabled = showShadows;
+  sunLight.castShadow = showShadows;
+  renderer.shadowMap.needsUpdate = true;
+  document.getElementById('btn-shadows').classList.toggle('active', showShadows);
+  log('SHADOWS', showShadows ? 'on' : 'off');
+}
+
+function resetCamera() {
+  camera.position.set(8, 7, 10);
+  controls.target.set(0, 0.5, 0);
+  log('RESET_CAMERA');
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  const indicator = document.getElementById('mode-indicator');
+  const labels = { move: 'MOVE [G]', rotate: 'ROTATE [R]', scale: 'SCALE [S]' };
+  indicator.textContent = labels[mode] || mode.toUpperCase();
+  indicator.style.display = 'block';
+  setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  const idx = { move: 0, rotate: 1, scale: 2 }[mode];
+  document.querySelectorAll('.view-btn')[idx]?.classList.add('active');
+  log('MODE', mode);
+}
+
+function filterCatalog(val) {
+  renderCatalog(val, currentCat);
+}
+
+function filterCat(cat, btn) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderCatalog(document.getElementById('search-input').value, cat);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT / IMPORT
+// ─────────────────────────────────────────────────────────────────────────────
+function exportJSON() {
+  try {
+    const data = {
+      name: document.getElementById('tb-project').value,
+      version: '1.0',
+      created: new Date().toISOString(),
+      objects: objects.map(o => ({
+        catId: o.catId, name: o.name, color: o.color, matType: o.matType,
+        position: o.group.position.toArray(),
+        rotation: [o.group.rotation.x, o.group.rotation.y, o.group.rotation.z],
+        scale: o.group.scale.x,
+      }))
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${data.name || 'project'}.json`; a.click();
+    URL.revokeObjectURL(url);
+    setStatus('Проект сохранён');
+    log('EXPORT', `${objects.length} objects`);
+  } catch(err) { handleError('exportJSON', err); }
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        newScene(true);
+        document.getElementById('tb-project').value = data.name || 'Загруженный';
+        (data.objects || []).forEach(obj => {
+          const def = CATALOG.find(c => c.id === obj.catId);
+          if (!def) return;
+          const group = def.build(obj.color || def.color);
+          group.userData = { catId: obj.catId, name: obj.name, color: obj.color, matType: obj.matType };
+          group.position.fromArray(obj.position || [0,0,0]);
+          group.rotation.set(...(obj.rotation || [0,0,0]));
+          group.scale.setScalar(obj.scale || 1);
+          scene.add(group);
+          objects.push({ group, catId: obj.catId, name: obj.name, color: obj.color || def.color, matType: obj.matType || 'wood' });
+        });
+        updateSceneList(); updateObjectCount(); updateEmptyHint();
+        setStatus(`Загружено: ${data.name} (${objects.length} объектов)`);
+        log('IMPORT', `${objects.length} objects`);
+      } catch(err) { handleError('importJSON', err); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function newScene(skipConfirm = false) {
+  if (!skipConfirm && objects.length > 0) {
+    showModal('Новая сцена', 'Очистить текущую сцену? Все объекты будут удалены.', () => {
+      clearScene();
+    });
+    return;
+  }
+  clearScene();
+}
+
+function clearScene() {
+  objects.forEach(o => scene.remove(o.group));
+  objects.length = 0;
+  undoStack = []; redoStack = [];
+  clearSelection();
+  updateSceneList(); updateObjectCount(); updateEmptyHint();
+  setStatus('Новая сцена создана');
+  log('CLEAR', 'scene');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = isError ? 'error' : '';
+}
+
+function updateObjectCount() {
+  document.getElementById('status-objects').textContent = `Объектов: ${objects.length}`;
+}
+
+function updateEmptyHint() {
+  document.getElementById('empty-hint').style.opacity = objects.length === 0 ? '1' : '0';
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function showModal(title, body, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  document.getElementById('modal-overlay').classList.add('show');
+  document.getElementById('modal-confirm').onclick = () => { closeModal(); onConfirm(); };
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────────────────────────────────────
+function resize() {
+  const vp = document.getElementById('viewport');
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+new ResizeObserver(resize).observe(document.getElementById('viewport'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FPS + STATS
+// ─────────────────────────────────────────────────────────────────────────────
+let frameCount = 0, lastFps = performance.now();
+function updateStats() {
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFps >= 1000) {
+    document.getElementById('fps-counter').textContent = `${frameCount} fps`;
+    frameCount = 0;
+    lastFps = now;
+    // Triangle count
+    let tris = 0;
+    scene.traverse(o => { if (o.isMesh && o.geometry?.index) tris += o.geometry.index.count / 3; });
+    document.getElementById('tri-count').textContent = `${Math.round(tris).toLocaleString()} треугольников`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  try {
+    controls.update();
+    renderer.render(scene, camera);
+    updateStats();
+    if (selectedObj && !isDragging) {
+      updatePropPositionFields();
+    }
+  } catch(err) {
+    handleError('animate', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+function init() {
+  try {
+    resize();
+    renderCatalog();
+    buildSwatches();
+    buildMatGrid();
+    updateSceneList();
+    updateObjectCount();
+    updateEmptyHint();
+    setStatus('DEESEYEN готов — выбери мебель из каталога слева');
+    log('INIT', 'Complete — DEESEYEN v1.0 Demo ready');
+    animate();
+    document.getElementById('btn-grid').classList.add('active');
+    document.getElementById('btn-shadows').classList.add('active');
+  } catch(err) {
+    handleError('init', err);
+  }
+}
+
+// Expose globals for inline handlers
+window.addFurniture = addFurniture;
+window.filterCatalog = filterCatalog;
+window.filterCat = filterCat;
+window.setView = setView;
+window.setMode = setMode;
+window.toggleGrid = toggleGrid;
+window.toggleShadows = toggleShadows;
+window.resetCamera = resetCamera;
+window.newScene = newScene;
+window.exportJSON = exportJSON;
+window.importJSON = importJSON;
+window.applyColor = applyColor;
+window.applyMaterial = applyMaterial;
+window.updateTransform = updateTransform;
+window.updateScale = updateScale;
+window.renameSelected = renameSelected;
+window.duplicateSelected = duplicateSelected;
+window.deleteSelected = deleteSelected;
+window.focusSelected = focusSelected;
+window.undo = undo;
+window.redo = redo;
+window.selectFromList = selectFromList;
+window.selectFromListAndDelete = selectFromListAndDelete;
+window.closeModal = closeModal;
+
+init();
+</script>
+</body>
+</html>
