@@ -34,7 +34,7 @@
     --shadow-deep: 0 8px 32px rgba(0,0,0,0.6);
     --radius: 10px;
     --transition: 0.18s ease;
-    --panel-w: 260px;
+    --panel-w: 288px;
     --topbar-h: 48px;
     --statusbar-h: 28px;
     --font: 'Inter', system-ui, -apple-system, sans-serif;
@@ -103,6 +103,38 @@
   .cat-item .name { font-size: 11px; color: var(--text-2); font-weight: 500; }
   .cat-item .dim { font-size: 10px; color: var(--text-3); }
   .cat-section-label { grid-column: 1/-1; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); padding: 6px 2px 2px; }
+
+  .lib-tabs { display: flex; gap: 4px; padding: 0 12px 8px; }
+  .lib-tab {
+    flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-2); color: var(--text-2); font-size: 11px; font-weight: 600; cursor: pointer; transition: var(--transition);
+  }
+  .lib-tab:hover { color: var(--text-1); background: var(--bg-3); }
+  .lib-tab.active { background: linear-gradient(135deg, rgba(99,102,241,0.35), var(--bg-3)); border-color: var(--border-active); color: var(--text-1); }
+
+  .tpl-strip {
+    display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 10px; align-items: center;
+  }
+  .tpl-strip > span { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; margin-right: 4px; width: 100%; }
+  .tpl-btn {
+    padding: 4px 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-2);
+    color: var(--text-2); font-size: 11px; cursor: pointer; transition: var(--transition);
+  }
+  .tpl-btn:hover { border-color: var(--accent); color: var(--accent-light); }
+
+  #help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: none; align-items: center; justify-content: center; z-index: 120; padding: 16px; }
+  #help-overlay.show { display: flex; }
+  .help-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px; padding: 22px; max-width: 420px; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow-deep); }
+  .help-card h3 { font-size: 15px; margin-bottom: 10px; }
+  .help-card p, .help-card li { font-size: 12px; color: var(--text-2); line-height: 1.55; margin-bottom: 8px; }
+  .help-card ul { padding-left: 18px; margin: 8px 0; }
+  .help-card a { color: var(--accent-light); }
+  .unit-pill-row { display: flex; gap: 4px; margin-bottom: 8px; }
+  .unit-pill {
+    flex: 1; padding: 4px 6px; font-size: 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg-2); color: var(--text-2); cursor: pointer;
+  }
+  .unit-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
   /* ── VIEWPORT ────────────────────────────────────────────────────── */
   #viewport { grid-area: viewport; position: relative; overflow: hidden; background: var(--bg-0); }
@@ -302,6 +334,12 @@
       <button class="tb-btn" onclick="redo()" title="Ctrl+Y">↪ Повтор</button>
     </div>
 
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="tb-btn" onclick="checkCollisions()" title="Как у Flatma: подсветка пересечений">◎ Пересечения</button>
+      <button class="tb-btn" onclick="showHelp()" title="О продукте">? Справка</button>
+    </div>
+
     <div id="tb-right">
       <input id="tb-project" type="text" value="DEESEYEN" placeholder="Название...">
       <span class="badge">Beta</span>
@@ -311,11 +349,21 @@
   <!-- LEFT CATALOG -->
   <aside id="catalog">
     <div id="catalog-header">
-      <h3>Каталог мебели</h3>
+      <h3 id="catalog-header-h3">Каталог</h3>
       <div class="search-box">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input id="search-input" type="text" placeholder="Поиск..." oninput="filterCatalog(this.value)">
       </div>
+    </div>
+    <div class="lib-tabs">
+      <button type="button" class="lib-tab active" id="lib-tab-furniture" onclick="setCatalogLibMode('furniture',this)">Мебель</button>
+      <button type="button" class="lib-tab" id="lib-tab-details" onclick="setCatalogLibMode('details',this)">Детали</button>
+    </div>
+    <div class="tpl-strip" id="template-strip">
+      <span>Шаблоны сцены</span>
+      <button type="button" class="tpl-btn" onclick="applyTemplate('kitchen')">Кухня</button>
+      <button type="button" class="tpl-btn" onclick="applyTemplate('wardrobe')">Шкаф</button>
+      <button type="button" class="tpl-btn" onclick="applyTemplate('living')">Гостиная</button>
     </div>
     <div class="cat-tabs">
       <button class="cat-tab active" onclick="filterCat('all',this)">Все</button>
@@ -351,7 +399,7 @@
 
     <div id="empty-hint">
       <div class="big-icon">🛋️</div>
-      <p>Нажми на мебель в каталоге<br>или перетащи на сцену</p>
+      <p>Выбери <b>Мебель</b> или <b>Детали</b> слева,<br>шаблон сцены или объект из списка</p>
     </div>
 
     <div id="mode-indicator">MOVE</div>
@@ -420,10 +468,14 @@
 
       <!-- Parametric cabinet (cm) -->
       <div class="prop-section" id="param-cabinet-section" style="display:none">
-        <h4>Корпус (см)</h4>
-        <div class="prop-row"><div class="prop-label">Ширина</div><input class="xyz-field" id="cab-w-cm" type="number" min="30" max="200" step="1" value="80"></div>
-        <div class="prop-row"><div class="prop-label">Высота</div><input class="xyz-field" id="cab-h-cm" type="number" min="60" max="280" step="1" value="200"></div>
-        <div class="prop-row"><div class="prop-label">Глубина</div><input class="xyz-field" id="cab-d-cm" type="number" min="25" max="100" step="1" value="55"></div>
+        <h4>Параметры корпуса</h4>
+        <div class="unit-pill-row" title="Как Flatma: мм или см для габаритов">
+          <button type="button" class="unit-pill active" id="unit-pill-cm" onclick="setLinearUnit('cm')">см</button>
+          <button type="button" class="unit-pill" id="unit-pill-mm" onclick="setLinearUnit('mm')">мм</button>
+        </div>
+        <div class="prop-row"><div class="prop-label" id="cab-label-w">Ш</div><input class="xyz-field" id="cab-w-cm" type="number" min="1" max="3000" step="1" value="80"></div>
+        <div class="prop-row"><div class="prop-label" id="cab-label-h">В</div><input class="xyz-field" id="cab-h-cm" type="number" min="1" max="3000" step="1" value="200"></div>
+        <div class="prop-row"><div class="prop-label" id="cab-label-d">Г</div><input class="xyz-field" id="cab-d-cm" type="number" min="1" max="3000" step="1" value="55"></div>
         <div class="prop-row"><div class="prop-label">Полки</div><input class="xyz-field" id="cab-shelves" type="number" min="0" max="10" step="1" value="3"></div>
         <div class="prop-row"><div class="prop-label">ДСП мм</div><input class="xyz-field" id="cab-thick-mm" type="number" min="8" max="28" step="1" value="18"></div>
         <div class="prop-row" style="align-items:center;gap:8px">
@@ -471,7 +523,7 @@
 
     <!-- Scene list -->
     <div class="prop-section">
-      <h4>Объекты в сцене</h4>
+      <h4>Элементы сцены</h4>
       <div id="scene-list"></div>
     </div>
 
@@ -491,15 +543,31 @@
 
   <!-- STATUS BAR -->
   <footer id="statusbar">
-    <span id="status-msg">Готово — нажми на мебель в каталоге чтобы добавить</span>
+    <span id="status-msg">Готово — выбери «Мебель» или «Детали», шаблон или объект из списка</span>
     <span class="status-sep">|</span>
     <span id="status-objects">Объектов: 0</span>
     <span class="status-sep">|</span>
-    <span>DEESEYEN v1.0 Demo</span>
+    <span id="spec-summary">Спецификация: —</span>
+    <span class="status-sep">|</span>
+    <span>DEESEYEN Studio</span>
   </footer>
 </div>
 
 <div id="toast"></div>
+<div id="help-overlay" onclick="if(event.target===this)closeHelp()">
+  <div class="help-card" onclick="event.stopPropagation()">
+    <h3>DEESEYEN Studio</h3>
+    <p>Онлайн-конструктор в духе <a href="https://flatma.com/create/designer" target="_blank" rel="noopener">Flatma</a> (библиотека / детали / параметры) и бизнес-логики вроде <a href="https://planplace.online/" target="_blank" rel="noopener">PlanPlace</a> (спецификация, проект). Это независимая демо-реализация: без интеграции с их сервисами.</p>
+    <ul>
+      <li><b>Мебель</b> — готовые модели; <b>Детали</b> — куб, цилиндр, столешница, стекло.</li>
+      <li><b>Шаблоны</b> — быстрый старт сцены (кухня / шкаф / гостиная).</li>
+      <li><b>Корпус (см/мм)</b> — параметрический шкаф, оценка нагрузки полки, ручки.</li>
+      <li><b>Пересечения</b> — грубая проверка объёмов (AABB).</li>
+      <li><b>JSON</b> — сохранение / открытие проекта.</li>
+    </ul>
+    <p style="margin-top:12px"><button class="btn-primary" type="button" onclick="closeHelp()">Закрыть</button></p>
+  </div>
+</div>
 <div id="modal-overlay">
   <div class="modal">
     <h3 id="modal-title">Новая сцена</h3>
@@ -555,6 +623,8 @@ function handleError(context, err) {
 // ─────────────────────────────────────────────────────────────────────────────
 /*
   REFERENCE BASE — compiled from research 2026-04-10
+  UX references 2026: Flatma (flatma.com/create/designer) — библиотека/детали/мм, крепёж, кромка;
+  PlanPlace (planplace.online) — спецификация, PDF/Excel, интеграции.
 
   TOP INSPIRATIONS:
   1. Planner 5D   — 2D↔3D toggle, 8000+ items, version history
@@ -834,6 +904,20 @@ function estimateShelfLoadKg(spec) {
   return Math.round(clampNum(k, 6, 130));
 }
 
+// Примитивы «Детали» (аналог секции Flatma)
+function buildPrimitiveBox(color, w, h, d, matType = 'wood') {
+  const g = new THREE.Group();
+  const m = makeMat(color, matType);
+  g.add(makeBox(w, h, d, m, 0, h / 2, 0));
+  return g;
+}
+function buildPrimitiveCylinder(color, r, h) {
+  const g = new THREE.Group();
+  const m = makeMat(color, 'metal');
+  g.add(makeCyl(r, r, h, m, 28, 0, h / 2, 0));
+  return g;
+}
+
 // SOFA
 function buildSofa(color) {
   const g = new THREE.Group();
@@ -1089,6 +1173,17 @@ const CATALOG = [
   { id:'rug',          name:'Ковёр',            cat:'decor',   icon:'🟫',  color:'#8B4513', build: buildRug,        dims:'240×160'},
 ];
 
+const DETAIL_CATALOG = [
+  { id: 'prim_cube', name: 'Куб', icon: '◼', color: '#8c7a60', dims: '60×40×40 см', build: () => buildPrimitiveBox('#8c7a60', 0.6, 0.4, 0.4, 'wood') },
+  { id: 'prim_cyl', name: 'Цилиндр', icon: '●', color: '#7a8088', dims: 'R20×H80 см', build: () => buildPrimitiveCylinder('#7a8088', 0.2, 0.8) },
+  { id: 'prim_counter', name: 'Столешница', icon: '▬', color: '#6b5344', dims: '180×60×4 см', build: () => buildPrimitiveBox('#6b5344', 1.8, 0.04, 0.6, 'wood') },
+  { id: 'prim_glass', name: 'Стекло', icon: '◇', color: '#aaccee', dims: '100×70 см', build: () => buildPrimitiveBox('#aaccee', 1.0, 0.7, 0.012, 'glass') },
+];
+
+function findCatDef(id) {
+  return CATALOG.find((c) => c.id === id) || DETAIL_CATALOG.find((c) => c.id === id);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1098,6 +1193,8 @@ let currentMode = 'move';
 let showGrid = true;
 let showShadows = true;
 let currentCat = 'all';
+let catalogLibMode = 'furniture'; // 'furniture' | 'details'
+let linearDisplayUnit = 'cm'; // 'cm' | 'mm' for cabinet W,H,D inputs only
 let undoStack = [];
 let redoStack = [];
 
@@ -1114,9 +1211,13 @@ function saveUndo(type, data) {
 // ADD FURNITURE
 // ─────────────────────────────────────────────────────────────────────────────
 function addFurniture(catId) {
+  addFurnitureAt(catId);
+}
+
+function addFurnitureAt(catId, px, pz) {
   try {
-    const def = CATALOG.find(c => c.id === catId);
-    if (!def) throw new Error(`Unknown furniture id: ${catId}`);
+    const def = findCatDef(catId);
+    if (!def) throw new Error(`Unknown id: ${catId}`);
     if (!def.parametric && typeof def.build !== 'function') throw new Error(`No build() for ${catId}`);
 
     let group;
@@ -1129,12 +1230,10 @@ function addFurniture(catId) {
       group.userData = { catId: def.id, color: def.color, matType: 'wood', name: def.name };
     }
 
-    // Stagger placement so items don't stack
-    const offset = objects.length;
     group.position.set(
-      (Math.random() - 0.5) * 4,
+      px !== undefined ? px : (Math.random() - 0.5) * 4,
       0,
-      (Math.random() - 0.5) * 4
+      pz !== undefined ? pz : (Math.random() - 0.5) * 4
     );
     group.castShadow = true;
     scene.add(group);
@@ -1152,8 +1251,139 @@ function addFurniture(catId) {
     setStatus(`Добавлен: ${def.name}`);
     log('ADD', def.name);
     showToast(`+ ${def.name} добавлен`);
-  } catch(err) {
-    handleError('addFurniture', err);
+  } catch (err) {
+    handleError('addFurnitureAt', err);
+  }
+}
+
+function applyTemplate(key) {
+  try {
+    const presets = {
+      kitchen: [
+        ['param_cabinet', -1.1, 0],
+        ['desk', 1.2, 0],
+        ['lamp', 0.2, -0.8],
+      ],
+      wardrobe: [['wardrobe', 0, 0]],
+      living: [
+        ['sofa', 0, 0],
+        ['coffee_table', 0, 0.6],
+        ['rug', 0, 0],
+      ],
+    };
+    const list = presets[key];
+    if (!list) return;
+    newScene(true);
+    list.forEach(([id, x, z]) => addFurnitureAt(id, x, z));
+    document.getElementById('tb-project').value = `Шаблон: ${key}`;
+    setStatus(`Шаблон «${key}» загружен`);
+    log('TEMPLATE', key);
+    showToast(`Шаблон: ${key}`);
+  } catch (err) {
+    handleError('applyTemplate', err);
+  }
+}
+
+function setCatalogLibMode(mode, btn) {
+  catalogLibMode = mode;
+  document.querySelectorAll('.lib-tab').forEach((t) => t.classList.remove('active'));
+  btn.classList.add('active');
+  const catTabs = document.querySelector('.cat-tabs');
+  const tpl = document.getElementById('template-strip');
+  if (catTabs) catTabs.style.display = mode === 'furniture' ? 'flex' : 'none';
+  if (tpl) tpl.style.display = mode === 'furniture' ? 'flex' : 'none';
+  const h3 = document.getElementById('catalog-header-h3');
+  if (h3) h3.textContent = mode === 'furniture' ? 'Каталог мебели' : 'Детали и примитивы';
+  renderCatalog(document.getElementById('search-input').value, currentCat);
+}
+
+function clearCollisionHighlights() {
+  objects.forEach((entry) => {
+    entry.group.traverse((ch) => {
+      if (!ch.isMesh || !ch.material) return;
+      const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+      mats.forEach((m) => {
+        m.emissive = new THREE.Color(0);
+        m.emissiveIntensity = 0;
+      });
+    });
+    entry.group.userData._collisionFlash = false;
+  });
+  if (selectedObj) selectObject(selectedObj);
+}
+
+function checkCollisions() {
+  try {
+    clearCollisionHighlights();
+    if (objects.length < 2) {
+      showToast('Нужно минимум 2 объекта');
+      return;
+    }
+    const boxes = objects.map((o) => ({
+      entry: o,
+      box: new THREE.Box3().setFromObject(o.group),
+    }));
+    const pairs = [];
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        if (boxes[i].box.intersectsBox(boxes[j].box)) pairs.push([boxes[i].entry, boxes[j].entry]);
+      }
+    }
+    if (pairs.length === 0) {
+      setStatus('Пересечений не найдено (AABB)');
+      showToast('Пересечений нет');
+      return;
+    }
+    const touched = new Set();
+    pairs.forEach(([a, b]) => {
+      touched.add(a);
+      touched.add(b);
+    });
+    touched.forEach((entry) => {
+      entry.group.traverse((ch) => {
+        if (!ch.isMesh || !ch.material) return;
+        const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+        mats.forEach((m) => {
+          m.emissive = new THREE.Color(0x771100);
+          m.emissiveIntensity = 0.5;
+        });
+      });
+      entry.group.userData._collisionFlash = true;
+    });
+    setStatus(`Пересечений: ${pairs.length} пар (оценка AABB)`);
+    showToast('Подсветка пересечений ~5 с');
+    setTimeout(() => clearCollisionHighlights(), 5200);
+    log('COLLISION', `${pairs.length} pairs`);
+  } catch (err) {
+    handleError('checkCollisions', err);
+  }
+}
+
+function showHelp() {
+  document.getElementById('help-overlay').classList.add('show');
+}
+function closeHelp() {
+  document.getElementById('help-overlay').classList.remove('show');
+}
+
+function cabDisplayLinear(cm) {
+  return linearDisplayUnit === 'mm' ? Math.round(cm * 10) : Math.round(cm);
+}
+
+function setLinearUnit(unit) {
+  linearDisplayUnit = unit === 'mm' ? 'mm' : 'cm';
+  document.getElementById('unit-pill-cm').classList.toggle('active', linearDisplayUnit === 'cm');
+  document.getElementById('unit-pill-mm').classList.toggle('active', linearDisplayUnit === 'mm');
+  const u = linearDisplayUnit === 'mm' ? 'мм' : 'см';
+  ['cab-label-w', 'cab-label-h', 'cab-label-d'].forEach((id, i) => {
+    const lbl = ['Ш', 'В', 'Г'][i];
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${lbl}, ${u}`;
+  });
+  if (selectedObj?.catId === 'param_cabinet' && selectedObj.params) {
+    document.getElementById('cab-w-cm').value = cabDisplayLinear(selectedObj.params.wCm);
+    document.getElementById('cab-h-cm').value = cabDisplayLinear(selectedObj.params.hCm);
+    document.getElementById('cab-d-cm').value = cabDisplayLinear(selectedObj.params.dCm);
   }
 }
 
@@ -1337,9 +1567,10 @@ function updatePropsPanel(entry) {
   const cabSec = document.getElementById('param-cabinet-section');
   if (entry.catId === 'param_cabinet' && entry.params) {
     cabSec.style.display = 'block';
-    document.getElementById('cab-w-cm').value = entry.params.wCm;
-    document.getElementById('cab-h-cm').value = entry.params.hCm;
-    document.getElementById('cab-d-cm').value = entry.params.dCm;
+    setLinearUnit(linearDisplayUnit);
+    document.getElementById('cab-w-cm').value = cabDisplayLinear(entry.params.wCm);
+    document.getElementById('cab-h-cm').value = cabDisplayLinear(entry.params.hCm);
+    document.getElementById('cab-d-cm').value = cabDisplayLinear(entry.params.dCm);
     document.getElementById('cab-shelves').value = entry.params.shelfCount;
     document.getElementById('cab-thick-mm').value = entry.params.thicknessMm;
     document.getElementById('cab-handles').checked = entry.params.handles !== false;
@@ -1374,11 +1605,17 @@ function updateCabinetLoadHint(spec) {
   el.textContent = `Оценка нагрузки одной полки (равномерно): ~${kg} кг. Эвристика для ориентира, не сертификация.`;
 }
 
+function readLinearFieldToCm(id, minCm, maxCm) {
+  const raw = clampNum(document.getElementById(id).value, 0, 100000);
+  const cm = linearDisplayUnit === 'mm' ? raw * 0.1 : raw;
+  return clampNum(cm, minCm, maxCm);
+}
+
 function readCabinetParamsFromInputs() {
   return {
-    wCm: clampNum(document.getElementById('cab-w-cm').value, 30, 200),
-    hCm: clampNum(document.getElementById('cab-h-cm').value, 60, 280),
-    dCm: clampNum(document.getElementById('cab-d-cm').value, 25, 100),
+    wCm: readLinearFieldToCm('cab-w-cm', 30, 200),
+    hCm: readLinearFieldToCm('cab-h-cm', 60, 280),
+    dCm: readLinearFieldToCm('cab-d-cm', 25, 100),
     shelfCount: Math.floor(clampNum(document.getElementById('cab-shelves').value, 0, 10)),
     thicknessMm: clampNum(document.getElementById('cab-thick-mm').value, 8, 28),
     handles: document.getElementById('cab-handles').checked,
@@ -1395,7 +1632,7 @@ function applyCabinetParams() {
     updateCabinetLoadHint(selectedObj.params);
     applyMaterial(selectedObj.matType || 'wood');
     selectObject(selectedObj);
-    setStatus('Корпус пересобран по размерам (см)');
+    setStatus(`Корпус пересобран (${linearDisplayUnit === 'mm' ? 'мм' : 'см'} → внутри см)`);
     log('CABINET', JSON.stringify(selectedObj.params));
     showToast('Размеры корпуса применены');
   } catch (err) {
@@ -1540,7 +1777,7 @@ function deleteSelected() {
 function duplicateSelected() {
   if (!selectedObj) return;
   try {
-    const def = CATALOG.find(c => c.id === selectedObj.catId);
+    const def = findCatDef(selectedObj.catId);
     if (!def) throw new Error('Catalog entry not found');
     let newGroup;
     if (def.parametric && selectedObj.params) {
@@ -1692,7 +1929,7 @@ function updateSceneList() {
     return;
   }
   list.innerHTML = objects.map((o, i) => {
-    const def = CATALOG.find(c => c.id === o.catId);
+    const def = findCatDef(o.catId);
     const isSelected = selectedObj === o;
     return `<div class="scene-item ${isSelected ? 'selected' : ''}" onclick="selectFromList(${i})">
       <span class="s-icon">${def ? def.icon : '📦'}</span>
@@ -1715,23 +1952,50 @@ function selectFromListAndDelete(idx) {
 // ─────────────────────────────────────────────────────────────────────────────
 function renderCatalog(filter = '', cat = 'all') {
   const container = document.getElementById('catalog-items');
-  const filtered = CATALOG.filter(c =>
-    (cat === 'all' || c.cat === cat) &&
-    (filter === '' || c.name.toLowerCase().includes(filter.toLowerCase()))
-  );
-
-  if (filtered.length === 0) {
-    container.innerHTML = '<div style="grid-column:1/-1;font-size:11px;color:var(--text-3);padding:8px 2px">Ничего не найдено</div>';
+  if (catalogLibMode === 'details') {
+    const filtered = DETAIL_CATALOG.filter(
+      (c) => filter === '' || c.name.toLowerCase().includes(filter.toLowerCase())
+    );
+    if (filtered.length === 0) {
+      container.innerHTML =
+        '<div style="grid-column:1/-1;font-size:11px;color:var(--text-3);padding:8px 2px">Нет деталей по запросу</div>';
+      return;
+    }
+    container.innerHTML = filtered
+      .map(
+        (c) =>
+          `<div class="cat-item" onclick="addFurniture('${c.id}')" title="Добавить деталь">
+      <span class="icon">${c.icon}</span>
+      <span class="name">${c.name}</span>
+      <span class="dim">${c.dims}</span>
+    </div>`
+      )
+      .join('');
     return;
   }
 
-  container.innerHTML = filtered.map(c =>
-    `<div class="cat-item" onclick="addFurniture('${c.id}')" title="Нажми для добавления">
+  const filtered = CATALOG.filter(
+    (c) =>
+      (cat === 'all' || c.cat === cat) &&
+      (filter === '' || c.name.toLowerCase().includes(filter.toLowerCase()))
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML =
+      '<div style="grid-column:1/-1;font-size:11px;color:var(--text-3);padding:8px 2px">Ничего не найдено</div>';
+    return;
+  }
+
+  container.innerHTML = filtered
+    .map((c) => {
+      const dimLabel = c.parametric ? 'параметры' : `${c.dims} см`;
+      return `<div class="cat-item" onclick="addFurniture('${c.id}')" title="Нажми для добавления">
       <span class="icon">${c.icon}</span>
       <span class="name">${c.name}</span>
-      <span class="dim">${c.dims} см</span>
-    </div>`
-  ).join('');
+      <span class="dim">${dimLabel}</span>
+    </div>`;
+    })
+    .join('');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1793,6 +2057,10 @@ function filterCatalog(val) {
 }
 
 function filterCat(cat, btn) {
+  if (catalogLibMode === 'details') {
+    const ft = document.getElementById('lib-tab-furniture');
+    if (ft) setCatalogLibMode('furniture', ft);
+  }
   currentCat = cat;
   document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
@@ -1806,7 +2074,7 @@ function exportJSON() {
   try {
     const data = {
       name: document.getElementById('tb-project').value,
-      version: '1.0',
+      version: '1.1',
       created: new Date().toISOString(),
       objects: objects.map(o => ({
         catId: o.catId, name: o.name, color: o.color, matType: o.matType,
@@ -1839,7 +2107,7 @@ function importJSON() {
         newScene(true);
         document.getElementById('tb-project').value = data.name || 'Загруженный';
         (data.objects || []).forEach(obj => {
-          const def = CATALOG.find(c => c.id === obj.catId);
+          const def = findCatDef(obj.catId);
           if (!def) return;
           let group;
           if (def.parametric && obj.params) {
@@ -1900,6 +2168,14 @@ function setStatus(msg, isError = false) {
 
 function updateObjectCount() {
   document.getElementById('status-objects').textContent = `Объектов: ${objects.length}`;
+  let meshCount = 0;
+  objects.forEach((o) =>
+    o.group.traverse((n) => {
+      if (n.isMesh) meshCount++;
+    })
+  );
+  const el = document.getElementById('spec-summary');
+  if (el) el.textContent = `Спецификация: ${meshCount} меш · ${objects.length} поз.`;
 }
 
 function updateEmptyHint() {
@@ -1986,8 +2262,9 @@ function init() {
     updateSceneList();
     updateObjectCount();
     updateEmptyHint();
-    setStatus('DEESEYEN готов — выбери мебель из каталога слева');
-    log('INIT', 'Complete — DEESEYEN v1.0 Demo ready');
+    setLinearUnit('cm');
+    setStatus('DEESEYEN Studio — каталог, детали, шаблоны, корпус см/мм');
+    log('INIT', 'Complete — DEESEYEN Studio ready');
     animate();
     document.getElementById('btn-grid').classList.add('active');
     document.getElementById('btn-shadows').classList.add('active');
@@ -2024,6 +2301,12 @@ window.closeModal = closeModal;
 window.applyCabinetParams = applyCabinetParams;
 window.applyRGBFromFields = applyRGBFromFields;
 window.toggleCabinetHandles = toggleCabinetHandles;
+window.setCatalogLibMode = setCatalogLibMode;
+window.applyTemplate = applyTemplate;
+window.checkCollisions = checkCollisions;
+window.showHelp = showHelp;
+window.closeHelp = closeHelp;
+window.setLinearUnit = setLinearUnit;
 
 init();
 </script>
